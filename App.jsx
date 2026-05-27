@@ -65,10 +65,11 @@ function createCharacter(override) {
     appearance: '', personality: '', background: '',
     occupationFormula: 'EDU20',
     abilities: { STR: 10, CON: 10, SIZ: 10, DEX: 10, APP: 10, INT: 10, POW: 10, EDU: 10 },
-    currentHP: 2, currentMP: 2, currentSAN: 50,
+    currentHP: 10, currentMP: 10, currentSAN: 50,
     temporaryInsanity: false, indefiniteInsanity: false,
     skills: { ...DEFAULT_SKILLS },
-    weapons: [], equipment: [], imageData: null,
+    customSkills: [],
+    weapons: [], equipment: [], imageData: null, sketchData: null,
     ...(override || {}),
   };
 }
@@ -148,13 +149,33 @@ const MADNESS_CARDS = [
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 function parseDice(expr) {
-  const m = expr.trim().match(/^(\d*)d(\d+)([+-]\d+)?$/i);
-  if (!m) return null;
-  const count = Math.max(1, Math.min(100, parseInt(m[1] || '1')));
-  const sides = Math.min(10000, parseInt(m[2]));
-  const mod   = parseInt(m[3] || '0');
-  const rolls = Array.from({ length: count }, () => Math.ceil(Math.random() * sides));
-  return { rolls, total: rolls.reduce((a, b) => a + b, 0) + mod, formula: expr.trim() };
+  const str = expr.trim().replace(/\s+/g, '');
+  if (!str) return null;
+  // Tokenize: supports "2d6+1d4+3", "3d6-2", "d100" etc.
+  const tokenRe = /([+-]?)(\d*d\d+|\d+)/gi;
+  const tokens = [];
+  let m;
+  while ((m = tokenRe.exec(str)) !== null) {
+    tokens.push({ sign: m[1] === '-' ? -1 : 1, part: m[2].toLowerCase() });
+  }
+  if (tokens.length === 0) return null;
+  let total = 0, rolls = [];
+  for (const { sign, part } of tokens) {
+    if (part.includes('d')) {
+      const dm = part.match(/^(\d*)d(\d+)$/);
+      if (!dm) return null;
+      const count = Math.max(1, Math.min(100, parseInt(dm[1] || '1')));
+      const sides = Math.max(1, Math.min(10000, parseInt(dm[2])));
+      for (let i = 0; i < count; i++) {
+        const r = Math.ceil(Math.random() * sides);
+        rolls.push(r);
+        total += sign * r;
+      }
+    } else {
+      total += sign * parseInt(part);
+    }
+  }
+  return { rolls, total, formula: str };
 }
 
 function judgeRoll(roll, skillPct) {
@@ -174,8 +195,8 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 function calcMaxStats(abilities) {
   return {
-    maxHP:  Math.max(1, Math.floor((abilities.CON + abilities.SIZ) / 10)),
-    maxMP:  Math.max(1, Math.floor(abilities.POW / 5)),
+    maxHP:  Math.max(1, Math.floor((abilities.CON + abilities.SIZ) / 2)),
+    maxMP:  Math.max(1, abilities.POW),
     maxSAN: Math.max(1, abilities.POW * 5),
   };
 }
@@ -262,54 +283,80 @@ function charToMember(char) {
 // ============================================================
 
 const GLOBAL_CSS = `
+  /* ===== CSS VARIABLES ===== */
+  :root {
+    --bg:#0a0a0f; --bg2:#111118; --bg3:#0d0d14;
+    --tx:#d4c9a8; --tx2:#7a7060; --tx3:#4a4438;
+    --ac:#c9a84c; --pac:#4a3e20;
+    --re:#8b1a1a; --re2:#c42828; --re-b:#3a0a0a; --re-bg:#160808;
+    --gr:#3d9a68; --gr-b:#1a3a1a; --gr-bg:#081408;
+    --bl:#4a7aaa; --bl-b:#1a2a4a; --bl-bg:#0a0e1a;
+    --bd:#1e1a28; --bd2:#2a2530; --scr:#2d4a3e;
+    --pb:#181810; --head:#070710;
+  }
+  :root[data-theme="light"] {
+    --bg:#f5f0e4; --bg2:#ece6d4; --bg3:#e6e0ce;
+    --tx:#231a08; --tx2:#6a5840; --tx3:#9a8a68;
+    --ac:#8b6010; --pac:#c8a840;
+    --re:#8b1a1a; --re2:#b02020; --re-b:#d09080; --re-bg:#f5e8e8;
+    --gr:#2a7a50; --gr-b:#90c0a0; --gr-bg:#e8f5ee;
+    --bl:#2a5a8a; --bl-b:#90aad0; --bl-bg:#e8eef8;
+    --bd:#c8b890; --bd2:#b8a878; --scr:#a89870;
+    --pb:#e8e0c8; --head:#ede5d0;
+  }
+
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background-color: #0a0a0f; color: #d4c9a8; font-family: 'Special Elite', cursive; min-height: 100vh; overflow-x: hidden; }
+  body { background-color: var(--bg); color: var(--tx); font-family: 'Special Elite', cursive; min-height: 100vh; overflow-x: hidden; }
   body::after {
     content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9998;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
     opacity: 0.3; mix-blend-mode: overlay;
   }
+  [data-theme="light"] body::after { opacity: 0.12; mix-blend-mode: multiply; }
   ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: #0a0a0f; }
-  ::-webkit-scrollbar-thumb { background: #2d4a3e; border-radius: 3px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--scr); border-radius: 3px; }
 
   input, textarea, select {
-    font-family: 'Special Elite', cursive; background: #0e0e14; color: #d4c9a8;
-    border: 1px solid #2a2530; border-radius: 3px; padding: 6px 10px;
+    font-family: 'Special Elite', cursive; background: var(--bg3); color: var(--tx);
+    border: 1px solid var(--bd2); border-radius: 3px; padding: 6px 10px;
     outline: none; font-size: 13px; line-height: 1.4; transition: border-color 0.2s; vertical-align: middle;
   }
-  input:focus, textarea:focus, select:focus { border-color: #c9a84c; }
+  input:focus, textarea:focus, select:focus { border-color: var(--ac); }
   input[type=number] { -moz-appearance: textfield; }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { opacity: 0.3; }
-  select { cursor: pointer; } select option { background: #111118; }
+  select { cursor: pointer; } select option { background: var(--bg2); }
 
   button { font-family: 'Special Elite', cursive; cursor: pointer; border: none; border-radius: 3px; transition: all 0.15s; font-size: 13px; line-height: 1.4; vertical-align: middle; }
 
-  .tab-btn { background: transparent; color: #7a7060; border: 1px solid #2a2530; padding: 8px 16px; font-size: 12px; letter-spacing: 0.06em; font-family: 'Cinzel', serif; border-radius: 3px 3px 0 0; border-bottom: none; white-space: nowrap; }
-  .tab-btn:hover { color: #c9a84c; border-color: #4a3e20; background: #0f0f18; }
-  .tab-btn.active { color: #c9a84c; background: #111118; border-color: #4a3e20; border-bottom: 2px solid #c9a84c; }
+  .tab-btn { background: transparent; color: var(--tx2); border: 1px solid var(--bd2); padding: 8px 16px; font-size: 12px; letter-spacing: 0.06em; font-family: 'Cinzel', serif; border-radius: 3px 3px 0 0; border-bottom: none; white-space: nowrap; }
+  .tab-btn:hover { color: var(--ac); border-color: var(--pac); background: var(--bg3); }
+  .tab-btn.active { color: var(--ac); background: var(--bg2); border-color: var(--pac); border-bottom: 2px solid var(--ac); }
 
-  .btn-primary { background: #181810; color: #c9a84c; border: 1px solid #4a3e20; padding: 7px 16px; }
-  .btn-primary:hover { background: #222215; border-color: #c9a84c; transform: translateY(-1px); }
+  .btn-primary { background: var(--pb); color: var(--ac); border: 1px solid var(--pac); padding: 7px 16px; }
+  .btn-primary:hover { background: var(--bg2); border-color: var(--ac); transform: translateY(-1px); }
   .btn-primary:active { transform: scale(0.97); }
 
-  .btn-danger { background: #160808; color: #8b1a1a; border: 1px solid #3a0a0a; padding: 5px 10px; font-size: 12px; }
-  .btn-danger:hover { background: #220e0e; color: #c42828; border-color: #8b1a1a; }
+  .btn-danger { background: var(--re-bg); color: var(--re); border: 1px solid var(--re-b); padding: 5px 10px; font-size: 12px; }
+  .btn-danger:hover { color: var(--re2); border-color: var(--re); }
 
-  .btn-ghost { background: transparent; color: #7a7060; border: 1px solid #2a2530; padding: 5px 10px; font-size: 12px; }
-  .btn-ghost:hover { color: #d4c9a8; border-color: #4a4438; }
+  .btn-ghost { background: transparent; color: var(--tx2); border: 1px solid var(--bd2); padding: 5px 10px; font-size: 12px; }
+  .btn-ghost:hover { color: var(--tx); border-color: var(--tx3); }
 
-  .btn-green { background: #081408; color: #3d9a68; border: 1px solid #1a3a1a; padding: 7px 14px; font-size: 12px; }
-  .btn-green:hover { background: #0c1c0c; color: #5aba88; border-color: #2a5a2a; }
+  .btn-green { background: var(--gr-bg); color: var(--gr); border: 1px solid var(--gr-b); padding: 7px 14px; font-size: 12px; }
+  .btn-green:hover { border-color: var(--gr); }
 
-  .btn-share { background: #0a0e1a; color: #4a7aaa; border: 1px solid #1a2a4a; padding: 5px 12px; font-size: 12px; }
-  .btn-share:hover { background: #0e1428; color: #6a9aca; border-color: #2a4a7a; }
+  .btn-share { background: var(--bl-bg); color: var(--bl); border: 1px solid var(--bl-b); padding: 5px 12px; font-size: 12px; }
+  .btn-share:hover { border-color: var(--bl); }
 
-  .section-title { font-family: 'Cinzel', serif; color: #c9a84c; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; border-bottom: 1px solid #1e1a28; padding-bottom: 8px; margin-bottom: 14px; }
-  .card { background: #111118; border: 1px solid #1e1a28; border-radius: 4px; padding: 16px; margin-bottom: 14px; }
+  .btn-theme { background: var(--bg3); color: var(--tx2); border: 1px solid var(--bd2); padding: 5px 12px; font-size: 12px; border-radius: 3px; }
+  .btn-theme:hover { color: var(--ac); border-color: var(--pac); }
 
-  .tab-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid #1e1a28; }
+  .section-title { font-family: 'Cinzel', serif; color: var(--ac); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; border-bottom: 1px solid var(--bd); padding-bottom: 8px; margin-bottom: 14px; }
+  .card { background: var(--bg2); border: 1px solid var(--bd); border-radius: 4px; padding: 16px; margin-bottom: 14px; }
+
+  .tab-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid var(--bd); }
 
   .abilities-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 8px; }
   .skills-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 5px; }
@@ -318,25 +365,28 @@ const GLOBAL_CSS = `
   .session-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
   .member-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 
-  .creature-card { background: #111118; border: 1px solid #1e1a28; border-radius: 4px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
-  .creature-card:hover { border-color: #4a3e20; box-shadow: 0 0 14px rgba(201,168,76,0.07); }
+  .creature-card { background: var(--bg2); border: 1px solid var(--bd); border-radius: 4px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
+  .creature-card:hover { border-color: var(--pac); box-shadow: 0 0 14px rgba(201,168,76,0.07); }
 
-  .char-tab { background: #0d0d14; color: #7a7060; border: 1px solid #2a2530; padding: 5px 12px; font-size: 12px; border-radius: 3px; white-space: nowrap; }
-  .char-tab:hover { color: #c9a84c; border-color: #4a3e20; }
-  .char-tab.active { color: #c9a84c; background: #181810; border-color: #4a3e20; }
+  .char-tab { background: var(--bg3); color: var(--tx2); border: 1px solid var(--bd2); padding: 5px 12px; font-size: 12px; border-radius: 3px; white-space: nowrap; }
+  .char-tab:hover { color: var(--ac); border-color: var(--pac); }
+  .char-tab.active { color: var(--ac); background: var(--pb); border-color: var(--pac); }
 
-  .group-tab { background: #0a0e18; color: #6a8aaa; border: 1px solid #1a2a3a; padding: 5px 12px; font-size: 12px; border-radius: 3px; white-space: nowrap; }
-  .group-tab:hover { color: #8aaaca; border-color: #2a4a6a; }
-  .group-tab.active { color: #8aaaca; background: #0e1828; border-color: #3a6a9a; }
+  .group-tab { background: var(--bl-bg); color: var(--bl); border: 1px solid var(--bl-b); padding: 5px 12px; font-size: 12px; border-radius: 3px; white-space: nowrap; }
+  .group-tab:hover { border-color: var(--bl); }
+  .group-tab.active { background: var(--bl-bg); border-color: var(--bl); font-weight: bold; }
 
-  .weapon-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px; background: #0d0d14; border: 1px solid #1e1a28; border-radius: 3px; margin-bottom: 6px; }
-  .equip-row  { display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: #0d0d14; border: 1px solid #1e1a28; border-radius: 3px; margin-bottom: 5px; }
+  .weapon-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 3px; margin-bottom: 6px; }
+  .equip-row  { display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 3px; margin-bottom: 5px; }
+  .custom-skill-row { display: flex; gap: 6px; align-items: center; padding: 5px 8px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 3px; margin-bottom: 5px; }
 
-  .share-box { background: #080c18; border: 1px solid #1a2a4a; border-radius: 4px; padding: 14px; margin-top: 10px; }
-  .import-box { background: #080c10; border: 1px solid #1a2a1a; border-radius: 4px; padding: 14px; margin-top: 10px; }
+  .share-box { background: var(--bl-bg); border: 1px solid var(--bl-b); border-radius: 4px; padding: 14px; margin-top: 10px; }
+  .import-box { background: var(--gr-bg); border: 1px solid var(--gr-b); border-radius: 4px; padding: 14px; margin-top: 10px; }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 9999; overflow: auto; padding: 20px; display: flex; align-items: flex-start; justify-content: center; }
-  .modal-inner { background: #111118; border: 1px solid #4a3e20; border-radius: 6px; padding: 24px; width: 100%; max-width: 780px; margin: auto; }
+  .modal-inner { background: var(--bg2); border: 1px solid var(--pac); border-radius: 6px; padding: 24px; width: 100%; max-width: 780px; margin: auto; }
+
+  .sketch-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; padding: 8px; background: var(--bg3); border-radius: 3px; border: 1px solid var(--bd); }
 
   @keyframes eldritch-reveal { 0% { opacity:0;transform:scale(1.6) rotate(-4deg);letter-spacing:0.5em;filter:blur(6px); } 50% { opacity:0.7;filter:blur(1px); } 75% { transform:scale(1.04) rotate(0.5deg);filter:blur(0); } 100% { opacity:1;transform:scale(1) rotate(0);letter-spacing:normal;filter:blur(0); } }
   @keyframes flicker { 0%,18%,20%,24%,54%,56%,100% { opacity:1; } 19%,22%,55% { opacity:0.15; } }
@@ -372,7 +422,7 @@ const GLOBAL_CSS = `
 // LEAF COMPONENTS
 // ============================================================
 
-const LBL = { display: 'block', fontSize: 10, color: '#7a7060', marginBottom: 4, letterSpacing: '0.1em', fontFamily: "'Cinzel', serif", textTransform: 'uppercase' };
+const LBL = { display: 'block', fontSize: 10, color: 'var(--tx2)', marginBottom: 4, letterSpacing: '0.1em', fontFamily: "'Cinzel', serif", textTransform: 'uppercase' };
 
 function LabeledInput({ label, value, onChange, type, placeholder, style }) {
   return (
@@ -395,31 +445,31 @@ function LabeledTextarea({ label, value, onChange, placeholder, rows }) {
 function AbilityRow({ label, value, onChange, flash }) {
   return (
     <div className={flash ? 'random-flash' : ''}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#0d0d14', border: '1px solid #1e1a28', borderRadius: 3, padding: '5px 10px' }}>
-      <span style={{ fontFamily: "'Cinzel', serif", color: '#c9a84c', fontSize: 12, width: 32, flexShrink: 0 }}>{label}</span>
+      style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '5px 10px' }}>
+      <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 12, width: 32, flexShrink: 0 }}>{label}</span>
       <input type="number" min="0" max="99" value={value} onChange={onChange}
         style={{ width: 50, textAlign: 'center', fontSize: 14, padding: '4px 6px', lineHeight: '1.4' }} />
-      <span style={{ color: '#4a4438', fontSize: 10, flexShrink: 0 }}>×5</span>
-      <span style={{ color: '#d4c9a8', fontSize: 13, minWidth: 28, textAlign: 'right' }}>{value * 5}</span>
+      <span style={{ color: 'var(--tx3)', fontSize: 10, flexShrink: 0 }}>×5</span>
+      <span style={{ color: 'var(--tx)', fontSize: 13, minWidth: 28, textAlign: 'right' }}>{value * 5}</span>
     </div>
   );
 }
 
 function StatTracker({ label, current, max, color, onDecrement, onIncrement }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (current / max) * 100)) : 0;
-  const barColor = pct <= 25 ? '#8b1a1a' : pct <= 50 ? '#8a6f28' : color;
+  const barColor = pct <= 25 ? 'var(--re)' : pct <= 50 ? 'var(--ac)' : color;
   return (
-    <div style={{ background: '#0d0d14', border: '1px solid ' + color + '44', borderRadius: 4, padding: '9px 12px', flex: '1 1 100px', minWidth: 95 }}>
+    <div style={{ background: 'var(--bg3)', border: '1px solid ' + color + '44', borderRadius: 4, padding: '9px 12px', flex: '1 1 100px', minWidth: 95 }}>
       <div style={{ fontFamily: "'Cinzel', serif", color, fontSize: 10, letterSpacing: '0.1em', marginBottom: 7, textTransform: 'uppercase' }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-        <button onClick={onDecrement} style={{ background: '#160808', color: '#8b1a1a', border: '1px solid #3a0a0a', width: 24, height: 24, fontSize: 15, borderRadius: 3, lineHeight: 1, fontFamily: 'monospace', flexShrink: 0 }}>−</button>
+        <button onClick={onDecrement} style={{ background: 'var(--re-bg)', color: 'var(--re)', border: '1px solid var(--re-b)', width: 24, height: 24, fontSize: 15, borderRadius: 3, lineHeight: 1, fontFamily: 'monospace', flexShrink: 0 }}>−</button>
         <div style={{ textAlign: 'center', flex: 1 }}>
-          <span style={{ fontSize: 18, color: '#d4c9a8', fontFamily: "'Cinzel', serif" }}>{current}</span>
-          <span style={{ fontSize: 10, color: '#4a4438' }}>/{max}</span>
+          <span style={{ fontSize: 18, color: 'var(--tx)', fontFamily: "'Cinzel', serif" }}>{current}</span>
+          <span style={{ fontSize: 10, color: 'var(--tx3)' }}>/{max}</span>
         </div>
-        <button onClick={onIncrement} style={{ background: '#080e08', color: '#3d6a58', border: '1px solid #1a3a1a', width: 24, height: 24, fontSize: 15, borderRadius: 3, lineHeight: 1, fontFamily: 'monospace', flexShrink: 0 }}>＋</button>
+        <button onClick={onIncrement} style={{ background: 'var(--gr-bg)', color: 'var(--gr)', border: '1px solid var(--gr-b)', width: 24, height: 24, fontSize: 15, borderRadius: 3, lineHeight: 1, fontFamily: 'monospace', flexShrink: 0 }}>＋</button>
       </div>
-      <div style={{ height: 3, background: '#0a0a0f', borderRadius: 2, overflow: 'hidden' }}>
+      <div style={{ height: 3, background: 'var(--bg)', borderRadius: 2, overflow: 'hidden' }}>
         <div style={{ width: pct + '%', height: '100%', background: barColor, transition: 'width 0.3s, background 0.3s' }} />
       </div>
     </div>
@@ -433,6 +483,123 @@ function CopyButton({ text, label }) {
     <button className="btn-share" onClick={handle} style={{ minWidth: 80 }}>
       {copied ? '✓ コピー済' : (label || '📋 コピー')}
     </button>
+  );
+}
+
+// ============================================================
+// SKETCH CANVAS (手書きメモ)
+// ============================================================
+
+function SketchCanvas({ data, onChange }) {
+  const canvasRef   = useRef(null);
+  const drawingRef  = useRef(false);
+  const lastPosRef  = useRef(null);
+  const penRef      = useRef({ color: '#231a08', size: 2, eraser: false });
+  const [penColor,  setPenColor]  = useState('#231a08');
+  const [penSize,   setPenSize]   = useState(2);
+  const [eraser,    setEraser]    = useState(false);
+  const PAPER = '#f8f5ee';
+
+  // sync state → ref (avoids stale closures in draw handlers)
+  penRef.current = { color: penColor, size: penSize, eraser };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (data) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0);
+      img.src = data;
+    }
+  }, []); // mount only — data is captured from closure at mount
+
+  const getPos = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - rect.left) * sx, y: (src.clientY - rect.top) * sy };
+  };
+
+  const startDraw = (e) => {
+    if (e.touches) e.preventDefault();
+    drawingRef.current = true;
+    lastPosRef.current = getPos(e);
+  };
+  const doDraw = (e) => {
+    if (e.touches) e.preventDefault();
+    if (!drawingRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const pos = getPos(e), last = lastPosRef.current || pos;
+    const p = penRef.current;
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = p.eraser ? PAPER : p.color;
+    ctx.lineWidth   = p.eraser ? p.size * 4 : p.size;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.stroke();
+    lastPosRef.current = pos;
+  };
+  const endDraw = () => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    lastPosRef.current = null;
+    if (canvasRef.current) onChange(canvasRef.current.toDataURL('image/png'));
+  };
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.getContext('2d').fillStyle = PAPER;
+    canvas.getContext('2d').fillRect(0, 0, canvas.width, canvas.height);
+    onChange(null);
+  };
+
+  const PEN_COLORS = ['#231a08','#c42828','#2a5a8a','#2a7a50','#8b6010','#6a2a7a'];
+  const SIZES = [1, 2, 4, 8];
+
+  return (
+    <div>
+      <div className="sketch-toolbar">
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {PEN_COLORS.map(c => (
+            <button key={c} onClick={() => { setPenColor(c); setEraser(false); }}
+              style={{ width: 20, height: 20, borderRadius: '50%', background: c, padding: 0, flexShrink: 0,
+                border: !eraser && penColor === c ? '2px solid var(--ac)' : '2px solid transparent', cursor: 'pointer' }} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, color: 'var(--tx2)' }}>太さ:</span>
+          {SIZES.map(s => (
+            <button key={s} onClick={() => { setPenSize(s); setEraser(false); }}
+              style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                background: penSize === s && !eraser ? 'var(--bg2)' : 'transparent',
+                border: '1px solid var(--bd2)', borderRadius: 3, padding: 0 }}>
+              <div style={{ width: Math.min(s * 2.5, 14), height: Math.min(s * 2.5, 14), borderRadius: '50%', background: 'var(--tx)' }} />
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setEraser(e => !e)}
+          style={{ fontSize: 11, padding: '3px 10px', background: eraser ? 'var(--pb)' : 'transparent',
+            color: eraser ? 'var(--ac)' : 'var(--tx2)', border: '1px solid ' + (eraser ? 'var(--pac)' : 'var(--bd2)'), borderRadius: 3, cursor: 'pointer' }}>
+          消しゴム
+        </button>
+        <button onClick={clearCanvas}
+          style={{ fontSize: 11, padding: '3px 10px', background: 'transparent', color: 'var(--re)', border: '1px solid var(--re-b)', borderRadius: 3, cursor: 'pointer' }}>
+          クリア
+        </button>
+        {data && <span style={{ fontSize: 10, color: 'var(--tx3)' }}>✓ 保存済</span>}
+      </div>
+      <canvas ref={canvasRef} width={800} height={380}
+        onMouseDown={startDraw} onMouseMove={doDraw} onMouseUp={endDraw} onMouseLeave={endDraw}
+        onTouchStart={startDraw} onTouchMove={doDraw} onTouchEnd={endDraw}
+        style={{ width: '100%', touchAction: 'none', cursor: eraser ? 'cell' : 'crosshair',
+          border: '1px solid var(--bd)', borderRadius: 3, display: 'block', background: PAPER }} />
+    </div>
   );
 }
 
@@ -460,7 +627,7 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
   return (
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: "'Cinzel', serif", color: '#7a7060', fontSize: 11, letterSpacing: '0.1em', flexShrink: 0 }}>探索者:</span>
+        <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--tx2)', fontSize: 11, letterSpacing: '0.1em', flexShrink: 0 }}>探索者:</span>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', flex: 1 }}>
           {characters.map(c => (
             <button key={c.id} className={'char-tab' + (c.id === activeId ? ' active' : '')}
@@ -479,7 +646,7 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
       </div>
 
       {active && (
-        <div style={{ marginTop: 6, fontSize: 11, color: '#4a4438' }}>
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--tx3)' }}>
           {active.occupation && <span>{active.occupation}</span>}
           {active.age && <span>　{active.age}歳</span>}
           {active.origin && <span>　{active.origin}出身</span>}
@@ -488,11 +655,11 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
 
       {panel === 'share' && active && (
         <div className="share-box slide-in">
-          <div style={{ fontSize: 11, color: '#6a8aaa', marginBottom: 8, fontFamily: "'Cinzel', serif", letterSpacing: '0.06em' }}>
+          <div style={{ fontSize: 11, color: 'var(--bl)', marginBottom: 8, fontFamily: "'Cinzel', serif", letterSpacing: '0.06em' }}>
             📤 このテキストをLINEなどで送ってください（画像は除外）
           </div>
           <textarea readOnly value={shareText} rows={5}
-            style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', background: '#04060e', color: '#8aaaca', border: '1px solid #1a2a4a', resize: 'none' }}
+            style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', background: 'var(--bg)', color: 'var(--bl)', border: '1px solid var(--bl-b)', resize: 'none' }}
             onClick={e => e.target.select()} />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <CopyButton text={shareText} label="📋 コピー" />
@@ -503,13 +670,13 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
 
       {panel === 'import' && (
         <div className="import-box slide-in">
-          <div style={{ fontSize: 11, color: '#3d9a68', marginBottom: 8, fontFamily: "'Cinzel', serif", letterSpacing: '0.06em' }}>
+          <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif", letterSpacing: '0.06em' }}>
             📥 共有テキストを貼り付けてインポート
           </div>
           <textarea value={importText} onChange={e => { setImportText(e.target.value); setImportErr(''); }}
             placeholder="━━━ CoC6 探索者... のテキストを貼り付け ━━━" rows={5}
             style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none' }} />
-          {importErr && <div style={{ color: '#c42828', fontSize: 12, marginTop: 4 }}>{importErr}</div>}
+          {importErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 4 }}>{importErr}</div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button className="btn-green" onClick={handleImport} style={{ fontSize: 12 }}>インポートする</button>
             <button className="btn-ghost" onClick={() => { setPanel(null); setImportText(''); setImportErr(''); }} style={{ fontSize: 12 }}>閉じる</button>
@@ -540,8 +707,8 @@ function CharDetailModal({ member, onClose }) {
       <div className="modal-inner">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <h2 style={{ fontFamily: "'Cinzel', serif", color: '#c9a84c', fontSize: 20, marginBottom: 4 }}>{char.name}</h2>
-            <div style={{ fontSize: 13, color: '#7a7060' }}>
+            <h2 style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 20, marginBottom: 4 }}>{char.name}</h2>
+            <div style={{ fontSize: 13, color: 'var(--tx2)' }}>
               {[char.furigana, char.occupation, char.age && char.age + '歳', char.origin].filter(Boolean).join('　/　')}
             </div>
           </div>
@@ -552,17 +719,17 @@ function CharDetailModal({ member, onClose }) {
           <div className="section-title">能力値</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {Object.entries(abilities).map(([ab, val]) => (
-              <div key={ab} style={{ textAlign: 'center', background: '#0d0d14', border: '1px solid #1e1a28', borderRadius: 3, padding: '6px 12px', minWidth: 54 }}>
-                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, color: '#7a7060' }}>{ab}</div>
-                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 18, color: '#c9a84c' }}>{val}</div>
-                <div style={{ fontSize: 10, color: '#4a4438' }}>{val*5}%</div>
+              <div key={ab} style={{ textAlign: 'center', background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '6px 12px', minWidth: 54 }}>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, color: 'var(--tx2)' }}>{ab}</div>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 18, color: 'var(--ac)' }}>{val}</div>
+                <div style={{ fontSize: 10, color: 'var(--tx3)' }}>{val*5}%</div>
               </div>
             ))}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap', fontSize: 12, color: '#7a7060' }}>
-          {[['最大HP', maxHP, '#3d9a68'], ['最大MP', maxMP, '#4a7aaa'], ['最大SAN', maxSAN, '#c9a84c'], ['DB', dmgBonus, '#8a6f28']].map(([l,v,c]) => (
+        <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap', fontSize: 12, color: 'var(--tx2)' }}>
+          {[['最大HP', maxHP, 'var(--gr)'], ['最大MP', maxMP, 'var(--bl)'], ['最大SAN', maxSAN, 'var(--ac)'], ['DB', dmgBonus, 'var(--ac)']].map(([l,v,c]) => (
             <span key={l}>{l}: <span style={{ color: c }}>{v}</span></span>
           ))}
         </div>
@@ -575,8 +742,8 @@ function CharDetailModal({ member, onClose }) {
                 const base = skill.base === 'DEX×2' ? abilities.DEX * 2 : (typeof skill.base === 'number' ? skill.base : 0);
                 const cur = char.skills[skill.key] ?? base;
                 return (
-                  <span key={skill.key} style={{ background: '#0d0d14', border: '1px solid #2a2530', borderRadius: 2, padding: '3px 8px', fontSize: 11 }}>
-                    {skill.label} <span style={{ color: '#c9a84c' }}>{cur}%</span>
+                  <span key={skill.key} style={{ background: 'var(--bg3)', border: '1px solid var(--bd2)', borderRadius: 2, padding: '3px 8px', fontSize: 11 }}>
+                    {skill.label} <span style={{ color: 'var(--ac)' }}>{cur}%</span>
                   </span>
                 );
               })}
@@ -588,7 +755,7 @@ function CharDetailModal({ member, onClose }) {
           <div style={{ marginBottom: 16 }}>
             <div className="section-title">背景・性格</div>
             {[['外見', char.appearance], ['性格', char.personality], ['背景', char.background]].map(([l, v]) =>
-              v ? <div key={l} style={{ marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}><span style={{ color: '#7a7060', fontSize: 10, fontFamily: "'Cinzel', serif" }}>{l}　</span>{v}</div> : null
+              v ? <div key={l} style={{ marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}><span style={{ color: 'var(--tx2)', fontSize: 10, fontFamily: "'Cinzel', serif" }}>{l}　</span>{v}</div> : null
             )}
           </div>
         )}
@@ -597,11 +764,11 @@ function CharDetailModal({ member, onClose }) {
           <div>
             <div className="section-title">武器</div>
             {char.weapons.map(w => (
-              <div key={w.id} style={{ fontSize: 12, padding: '5px 0', borderBottom: '1px solid #1e1a28', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: '#c9a84c', minWidth: 80 }}>{w.name}</span>
-                {w.skill && <span style={{ color: '#7a7060' }}>技能: {w.skill}</span>}
+              <div key={w.id} style={{ fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--bd)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--ac)', minWidth: 80 }}>{w.name}</span>
+                {w.skill && <span style={{ color: 'var(--tx2)' }}>技能: {w.skill}</span>}
                 {w.damage && <span>ダメージ: {w.damage}</span>}
-                {w.memo && <span style={{ color: '#4a4438' }}>— {w.memo}</span>}
+                {w.memo && <span style={{ color: 'var(--tx3)' }}>— {w.memo}</span>}
               </div>
             ))}
           </div>
@@ -652,6 +819,9 @@ function CharacterSheet({ character, onChange }) {
   const addEquip  = () => onChange(prev => ({ ...prev, equipment: [...(prev.equipment||[]), { id: uid(), name:'', qty:'1', memo:'' }] }));
   const upEquip   = (id, f, v) => onChange(prev => ({ ...prev, equipment: (prev.equipment||[]).map(e => e.id===id ? {...e,[f]:v} : e) }));
   const delEquip  = (id) => onChange(prev => ({ ...prev, equipment: (prev.equipment||[]).filter(e => e.id!==id) }));
+  const addCustomSkill = () => onChange(prev => ({ ...prev, customSkills: [...(prev.customSkills||[]), { id: uid(), label:'', value: 0 }] }));
+  const upCustomSkill  = (id, f, v) => onChange(prev => ({ ...prev, customSkills: (prev.customSkills||[]).map(s => s.id===id ? {...s,[f]:v} : s) }));
+  const delCustomSkill = (id) => onChange(prev => ({ ...prev, customSkills: (prev.customSkills||[]).filter(s => s.id!==id) }));
 
   return (
     <div style={{ padding: '0 20px 20px', maxWidth: 940, margin: '0 auto' }}>
@@ -661,12 +831,13 @@ function CharacterSheet({ character, onChange }) {
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ flexShrink: 0 }}>
             <div onClick={() => fileRef.current && fileRef.current.click()}
-              style={{ width: 88, height: 108, background: '#0d0d14', border: '1px solid #2a2530', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', transition: 'border-color 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#c9a84c'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = '#2a2530'}>
+              style={{ width: 88, height: 108, background: 'var(--bg3)', border: '1px solid var(--bd2)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', transition: 'border-color 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--ac)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--bd2)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--bd2)'}>
               {character.imageData
                 ? <img src={character.imageData} alt="portrait" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <div style={{ textAlign: 'center', color: '#4a4438', fontSize: 11, lineHeight: 1.5, padding: 8 }}><div style={{ fontSize: 22, marginBottom: 4 }}>👤</div>画像を<br/>追加</div>}
+                : <div style={{ textAlign: 'center', color: 'var(--tx3)', fontSize: 11, lineHeight: 1.5, padding: 8 }}><div style={{ fontSize: 22, marginBottom: 4 }}>👤</div>画像を<br/>追加</div>}
             </div>
             <input ref={fileRef} type="file" accept="image/*" onChange={handleImg} style={{ display: 'none' }} />
             {character.imageData && <button className="btn-ghost" onClick={() => onChange(prev => ({...prev, imageData: null}))} style={{ width: '100%', marginTop: 4, fontSize: 10, padding: '3px 0' }}>削除</button>}
@@ -684,9 +855,9 @@ function CharacterSheet({ character, onChange }) {
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignSelf: 'flex-end' }}>
-            {[['DB', dmgBonus, '#8a6f28'], ['職業P', occFormula.calc(abilities), '#3d9a68'], ['趣味P', abilities.INT*10, '#4a7aaa'], ['SAN上限', maxSAN, '#c9a84c']].map(([l,v,c]) => (
-              <div key={l} style={{ textAlign: 'center', background: '#0d0d14', border: '1px solid #1e1a28', borderRadius: 3, padding: '6px 10px', minWidth: 52 }}>
-                <div style={{ fontSize: 9, color: '#7a7060', fontFamily: "'Cinzel', serif", marginBottom: 3 }}>{l}</div>
+            {[['DB', dmgBonus, 'var(--ac)'], ['職業P', occFormula.calc(abilities), 'var(--gr)'], ['趣味P', abilities.INT*10, 'var(--bl)'], ['SAN上限', maxSAN, 'var(--ac)']].map(([l,v,c]) => (
+              <div key={l} style={{ textAlign: 'center', background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '6px 10px', minWidth: 52 }}>
+                <div style={{ fontSize: 9, color: 'var(--tx2)', fontFamily: "'Cinzel', serif", marginBottom: 3 }}>{l}</div>
                 <div style={{ fontSize: 14, color: c, fontFamily: "'Cinzel', serif" }}>{v}</div>
               </div>
             ))}
@@ -725,7 +896,7 @@ function CharacterSheet({ character, onChange }) {
       {/* Abilities */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>能力値<span style={{ fontSize: 10, color: '#4a4438', fontFamily: 'inherit', marginLeft: 8 }}>（右列 = ×5 基本技能値）</span></div>
+          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>能力値<span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', marginLeft: 8 }}>（右列 = ×5 基本技能値）</span></div>
           <button className="btn-green" onClick={handleRandom} style={{ fontSize: 12 }}>🎲 ランダム決定</button>
         </div>
         <div className="abilities-grid">
@@ -733,8 +904,8 @@ function CharacterSheet({ character, onChange }) {
             <AbilityRow key={ab} label={ab} value={abilities[ab]} flash={!!randomFlash} onChange={e => setAbility(ab, e.target.value)} />
           ))}
         </div>
-        <div style={{ marginTop: 10, fontSize: 11, color: '#4a4438', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-          {Object.entries(ABILITY_ROLL).map(([ab, f]) => <span key={ab}><span style={{ color: '#3a3430' }}>{ab}:</span> {f}</span>)}
+        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--tx3)', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          {Object.entries(ABILITY_ROLL).map(([ab, f]) => <span key={ab}><span style={{ color: 'var(--tx3)' }}>{ab}:</span> {f}</span>)}
         </div>
       </div>
 
@@ -742,22 +913,22 @@ function CharacterSheet({ character, onChange }) {
       <div className="card">
         <div className="section-title">副次能力値</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-          <StatTracker label="HP 耐久力" current={currentHP} max={maxHP} color="#3d9a68"
+          <StatTracker label="HP 耐久力" current={currentHP} max={maxHP} color="var(--gr)"
             onDecrement={() => set('currentHP', clamp(currentHP-1,0,maxHP))} onIncrement={() => set('currentHP', clamp(currentHP+1,0,maxHP))} />
-          <StatTracker label="MP マジック" current={currentMP} max={maxMP} color="#4a7aaa"
+          <StatTracker label="MP マジック" current={currentMP} max={maxMP} color="var(--bl)"
             onDecrement={() => set('currentMP', clamp(currentMP-1,0,maxMP))} onIncrement={() => set('currentMP', clamp(currentMP+1,0,maxMP))} />
-          <StatTracker label="SAN 正気度" current={currentSAN} max={maxSAN} color="#c9a84c"
+          <StatTracker label="SAN 正気度" current={currentSAN} max={maxSAN} color="var(--ac)"
             onDecrement={() => set('currentSAN', clamp(currentSAN-1,0,maxSAN))} onIncrement={() => set('currentSAN', clamp(currentSAN+1,0,maxSAN))} />
         </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11, color: '#7a7060', marginBottom: 10 }}>
-          {[['最大HP',maxHP,'(CON+SIZ)÷10'],['最大MP',maxMP,'POW÷5'],['最大SAN',maxSAN,'POW×5'],['DB',dmgBonus,'STR+SIZ']].map(([l,v,f]) => (
-            <span key={l}><span style={{ fontFamily: "'Cinzel', serif", fontSize: 10 }}>{l}: </span><span style={{ color: '#c9a84c' }}>{v}</span><span style={{ color: '#4a4438', fontSize: 10 }}> {f}</span></span>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11, color: 'var(--tx2)', marginBottom: 10 }}>
+          {[['最大HP',maxHP,'(CON+SIZ)÷2'],['最大MP',maxMP,'POW'],['最大SAN',maxSAN,'POW×5'],['DB',dmgBonus,'STR+SIZ']].map(([l,v,f]) => (
+            <span key={l}><span style={{ fontFamily: "'Cinzel', serif", fontSize: 10 }}>{l}: </span><span style={{ color: 'var(--ac)' }}>{v}</span><span style={{ color: 'var(--tx3)', fontSize: 10 }}> {f}</span></span>
           ))}
         </div>
         <div style={{ display: 'flex', gap: 16 }}>
           {[['一時的狂気','temporaryInsanity'],['不定の狂気','indefiniteInsanity']].map(([lbl,key]) => (
-            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#7a7060' }}>
-              <input type="checkbox" checked={character[key]||false} onChange={e => set(key, e.target.checked)} style={{ width:14,height:14,accentColor:'#8b1a1a',padding:0 }} />
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: 'var(--tx2)' }}>
+              <input type="checkbox" checked={character[key]||false} onChange={e => set(key, e.target.checked)} style={{ width:14,height:14,accentColor:'var(--re)',padding:0 }} />
               {lbl}
             </label>
           ))}
@@ -766,15 +937,15 @@ function CharacterSheet({ character, onChange }) {
 
       {/* Skills */}
       <div className="card">
-        <div className="section-title">技能リスト <span style={{ fontSize: 10, color: '#4a4438', fontFamily: 'inherit', textTransform: 'none' }}>基本値 → 現在値</span></div>
+        <div className="section-title">技能リスト <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>基本値 → 現在値</span></div>
         <div className="skills-grid">
           {COC6_SKILLS.map(skill => {
             const base = skill.base === 'DEX×2' ? abilities.DEX * 2 : skill.base;
             const cur  = skills[skill.key] !== undefined ? skills[skill.key] : (typeof base === 'number' ? base : 0);
             return (
-              <div key={skill.key} style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#0d0d14', border: '1px solid #1a1620', borderRadius: 3, padding: '4px 8px' }}>
-                <span style={{ flex: 1, fontSize: 12, color: '#d4c9a8' }}>{skill.label}</span>
-                <span style={{ fontSize: 10, color: '#4a4438', width: 24, textAlign: 'right', flexShrink: 0 }}>{base}</span>
+              <div key={skill.key} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
+                <span style={{ flex: 1, fontSize: 12, color: 'var(--tx)' }}>{skill.label}</span>
+                <span style={{ fontSize: 10, color: 'var(--tx3)', width: 24, textAlign: 'right', flexShrink: 0 }}>{base}</span>
                 <input type="number" min="0" max="99" value={cur} onChange={e => setSkill(skill.key, e.target.value)}
                   style={{ width: 44, textAlign: 'center', padding: '3px 4px', fontSize: 13, lineHeight: '1.4' }} />
               </div>
@@ -789,7 +960,7 @@ function CharacterSheet({ character, onChange }) {
           <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>武器・攻撃</div>
           <button className="btn-primary" onClick={addWeapon} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
         </div>
-        {weapons.length === 0 && <div style={{ color: '#4a4438', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>武器が登録されていません</div>}
+        {weapons.length === 0 && <div style={{ color: 'var(--tx3)', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>武器が登録されていません</div>}
         {weapons.map(w => (
           <div key={w.id} className="weapon-row">
             <input value={w.name}        onChange={e => upWeapon(w.id,'name',e.target.value)}        placeholder="武器名"  style={{ flex: '2 1 90px', minWidth: 70 }} />
@@ -810,16 +981,46 @@ function CharacterSheet({ character, onChange }) {
           <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>所持品・装備</div>
           <button className="btn-primary" onClick={addEquip} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
         </div>
-        {equipment.length === 0 && <div style={{ color: '#4a4438', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>所持品が登録されていません</div>}
+        {equipment.length === 0 && <div style={{ color: 'var(--tx3)', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>所持品が登録されていません</div>}
         {equipment.map(e => (
           <div key={e.id} className="equip-row">
             <input value={e.name} onChange={ev => upEquip(e.id,'name',ev.target.value)} placeholder="アイテム名" style={{ flex: '2 1 90px', minWidth: 70 }} />
-            <span style={{ fontSize: 11, color: '#7a7060' }}>×</span>
+            <span style={{ fontSize: 11, color: 'var(--tx2)' }}>×</span>
             <input type="number" value={e.qty} onChange={ev => upEquip(e.id,'qty',ev.target.value)} placeholder="1" style={{ width: 44, textAlign: 'center' }} />
             <input value={e.memo} onChange={ev => upEquip(e.id,'memo',ev.target.value)} placeholder="メモ" style={{ flex: '3 1 110px', minWidth: 80 }} />
             <button className="btn-danger" onClick={() => delEquip(e.id)}>✕</button>
           </div>
         ))}
+      </div>
+
+      {/* Custom Skills */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>
+            カスタム技能 <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>自分で技能を追加</span>
+          </div>
+          <button className="btn-primary" onClick={addCustomSkill} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
+        </div>
+        {(character.customSkills||[]).length === 0 && (
+          <div style={{ color: 'var(--tx3)', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>＋ 追加 でオリジナル技能を登録できます</div>
+        )}
+        {(character.customSkills||[]).map(sk => (
+          <div key={sk.id} className="custom-skill-row">
+            <input value={sk.label} onChange={e => upCustomSkill(sk.id,'label',e.target.value)}
+              placeholder="技能名（例：古代語、手品…）" style={{ flex: '3 1 140px', minWidth: 100 }} />
+            <input type="number" min="0" max="99" value={sk.value} onChange={e => upCustomSkill(sk.id,'value',Math.max(0,parseInt(e.target.value)||0))}
+              style={{ width: 52, textAlign: 'center', fontSize: 13 }} />
+            <span style={{ fontSize: 11, color: 'var(--tx3)' }}>%</span>
+            <button className="btn-danger" onClick={() => delCustomSkill(sk.id)}>✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* Sketch Memo */}
+      <div className="card">
+        <div className="section-title">手書きメモ</div>
+        <SketchCanvas key={character.id} data={character.sketchData}
+          onChange={v => set('sketchData', v)} />
       </div>
     </div>
   );
@@ -829,7 +1030,7 @@ function CharacterSheet({ character, onChange }) {
 // TAB 2: DICE ROLLER
 // ============================================================
 
-const J_COLORS = { 'roll-critical':'#c9a84c', 'roll-hard':'#3d9a6a', 'roll-success':'#5a8a70', 'roll-fail':'#7a7060', 'roll-fumble':'#c42828' };
+const J_COLORS = { 'roll-critical':'var(--ac)', 'roll-hard':'var(--gr)', 'roll-success':'var(--gr)', 'roll-fail':'var(--tx2)', 'roll-fumble':'var(--re2)' };
 
 function DiceRoller() {
   const [diceCount,  setDiceCount]  = useState(1);
@@ -857,15 +1058,15 @@ function DiceRoller() {
     setRollResult(entry); push(entry);
   };
   const n = Math.max(1, Math.min(20, diceCount));
-  const resultColor = rollResult ? (rollResult.judgment ? (J_COLORS[rollResult.judgment.cls]||'#d4c9a8') : '#c9a84c') : '#c9a84c';
+  const resultColor = rollResult ? (rollResult.judgment ? (J_COLORS[rollResult.judgment.cls]||'var(--tx)') : 'var(--ac)') : 'var(--ac)';
 
   return (
     <div style={{ padding: '16px 20px', maxWidth: 800, margin: '0 auto' }}>
       <div className="card">
         <div className="section-title">クイックロール</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#0d0d14', border: '1px solid #2a2530', borderRadius: 3, padding: '5px 10px' }}>
-            <span style={{ fontSize: 11, color: '#7a7060', fontFamily: "'Cinzel', serif" }}>個数:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--bd2)', borderRadius: 3, padding: '5px 10px' }}>
+            <span style={{ fontSize: 11, color: 'var(--tx2)', fontFamily: "'Cinzel', serif" }}>個数:</span>
             <input type="number" min="1" max="20" value={diceCount} onChange={e => setDiceCount(Math.max(1,Math.min(20,parseInt(e.target.value)||1)))}
               style={{ width: 44, textAlign: 'center', padding: '3px 5px', lineHeight: '1.4' }} />
           </div>
@@ -885,7 +1086,7 @@ function DiceRoller() {
           </div>
           <button className="btn-primary" onClick={() => doRoll(customExpr)}>ロール</button>
         </div>
-        {customErr && <div style={{ color: '#c42828', fontSize: 12, marginTop: 8 }}>{customErr}</div>}
+        {customErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 8 }}>{customErr}</div>}
       </div>
 
       <div className="card">
@@ -897,8 +1098,8 @@ function DiceRoller() {
           </div>
           <button className="btn-primary" onClick={doSkillCheck}>判定</button>
         </div>
-        <div style={{ fontSize: 11, color: '#4a4438', lineHeight: 1.9 }}>
-          <span style={{ color: '#c9a84c' }}>イマジナリー</span>: ≤値÷5　<span style={{ color: '#3d9a6a' }}>困難成功</span>: ≤値÷2　<span style={{ color: '#5a8a70' }}>通常成功</span>: ≤値　<span style={{ color: '#c42828' }}>ファンブル</span>: 96〜100(値&lt;50)/100(値≥50)
+        <div style={{ fontSize: 11, color: 'var(--tx3)', lineHeight: 1.9 }}>
+          <span style={{ color: 'var(--ac)' }}>イマジナリー</span>: ≤値÷5　<span style={{ color: 'var(--gr)' }}>困難成功</span>: ≤値÷2　<span style={{ color: 'var(--gr)' }}>通常成功</span>: ≤値　<span style={{ color: 'var(--re2)' }}>ファンブル</span>: 96〜100(値&lt;50)/100(値≥50)
         </div>
       </div>
 
@@ -906,11 +1107,11 @@ function DiceRoller() {
         <div className="card" key={rollResult.id}>
           <div className="section-title">結果</div>
           <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
-            {rollResult.label && <div style={{ fontSize: 12, color: '#7a7060', marginBottom: 10 }}>{rollResult.label}</div>}
+            {rollResult.label && <div style={{ fontSize: 12, color: 'var(--tx2)', marginBottom: 10 }}>{rollResult.label}</div>}
             <div className={'roll-result-anim' + (rollResult.judgment ? (' '+(rollResult.judgment.cls==='roll-fumble'?'roll-fumble-anim':rollResult.judgment.cls==='roll-critical'?'roll-critical-anim':'')) : '')}
               style={{ fontSize: 72, fontFamily: "'Cinzel', serif", color: resultColor, lineHeight: 1 }}>{rollResult.total}</div>
-            {rollResult.rolls.length > 1 && <div style={{ fontSize: 12, color: '#7a7060', marginTop: 8 }}>[{rollResult.rolls.join(', ')}]</div>}
-            {rollResult.judgment && <div style={{ fontSize: 22, fontFamily: "'Cinzel', serif", color: J_COLORS[rollResult.judgment.cls]||'#d4c9a8', marginTop: 14, letterSpacing: '0.1em' }}>{rollResult.judgment.label}</div>}
+            {rollResult.rolls.length > 1 && <div style={{ fontSize: 12, color: 'var(--tx2)', marginTop: 8 }}>[{rollResult.rolls.join(', ')}]</div>}
+            {rollResult.judgment && <div style={{ fontSize: 22, fontFamily: "'Cinzel', serif", color: J_COLORS[rollResult.judgment.cls]||'var(--tx)', marginTop: 14, letterSpacing: '0.1em' }}>{rollResult.judgment.label}</div>}
           </div>
         </div>
       )}
@@ -919,12 +1120,12 @@ function DiceRoller() {
         <div className="card">
           <div className="section-title">ロール履歴（直近10件）</div>
           {history.map((entry, i) => (
-            <div key={entry.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'5px 10px', borderRadius:3, fontSize:12, background:i===0?'#0d0d14':'transparent', border:'1px solid '+(i===0?'#1e1a28':'transparent') }}>
-              <span style={{ color:'#4a4438', width:56, flexShrink:0, fontSize:10 }}>{entry.time}</span>
-              <span style={{ color:'#7a7060', width:58, flexShrink:0, fontSize:11 }}>{entry.formula}</span>
-              <span style={{ fontFamily:"'Cinzel', serif", color:'#c9a84c', fontSize:16, width:38, textAlign:'right', flexShrink:0 }}>{entry.total}</span>
-              {entry.judgment && <span style={{ color:J_COLORS[entry.judgment.cls]||'#7a7060', fontSize:11 }}>{entry.judgment.label}</span>}
-              {entry.label && !entry.judgment && <span style={{ color:'#7a7060', fontSize:11 }}>{entry.label}</span>}
+            <div key={entry.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'5px 10px', borderRadius:3, fontSize:12, background:i===0?'var(--bg3)':'transparent', border:'1px solid '+(i===0?'var(--bd)':'transparent') }}>
+              <span style={{ color:'var(--tx3)', width:56, flexShrink:0, fontSize:10 }}>{entry.time}</span>
+              <span style={{ color:'var(--tx2)', width:58, flexShrink:0, fontSize:11 }}>{entry.formula}</span>
+              <span style={{ fontFamily:"'Cinzel', serif", color:'var(--ac)', fontSize:16, width:38, textAlign:'right', flexShrink:0 }}>{entry.total}</span>
+              {entry.judgment && <span style={{ color:J_COLORS[entry.judgment.cls]||'var(--tx2)', fontSize:11 }}>{entry.judgment.label}</span>}
+              {entry.label && !entry.judgment && <span style={{ color:'var(--tx2)', fontSize:11 }}>{entry.label}</span>}
             </div>
           ))}
         </div>
@@ -959,7 +1160,7 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
         <div className="section-title">セッションノート</div>
         <textarea value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} placeholder="セッションの出来事、重要な情報、謎のメモ..."
           style={{ width: '100%', minHeight: 140, resize: 'vertical', lineHeight: 1.7 }} />
-        <div style={{ textAlign: 'right', fontSize: 10, color: '#4a4438', marginTop: 4 }}>自動保存中</div>
+        <div style={{ textAlign: 'right', fontSize: 10, color: 'var(--tx3)', marginTop: 4 }}>自動保存中</div>
       </div>
       <div className="session-grid">
         <div className="card" style={{ margin: 0 }}>
@@ -969,12 +1170,12 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
             <button className="btn-primary" onClick={addNpc}>追加</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
-            {npcs.length===0 && <div style={{ color:'#4a4438', fontSize:12, textAlign:'center', padding:'16px 0' }}>NPCが登録されていません</div>}
+            {npcs.length===0 && <div style={{ color:'var(--tx3)', fontSize:12, textAlign:'center', padding:'16px 0' }}>NPCが登録されていません</div>}
             {npcs.map(npc => (
-              <div key={npc.id} style={{ background:'#0d0d14', border:'1px solid #1e1a28', borderRadius:3, padding:'8px 10px' }}>
+              <div key={npc.id} style={{ background:'var(--bg3)', border:'1px solid var(--bd)', borderRadius:3, padding:'8px 10px' }}>
                 <div style={{ display:'flex', gap:6, marginBottom:6, alignItems:'center' }}>
                   <input value={npc.name} onChange={e => upNpc(npc.id,'name',e.target.value)} style={{ flex:1 }} placeholder="名前" />
-                  <span style={{ fontSize:10, color:'#7a7060' }}>HP</span>
+                  <span style={{ fontSize:10, color:'var(--tx2)' }}>HP</span>
                   <input type="number" value={npc.hp} onChange={e => upNpc(npc.id,'hp',e.target.value)} style={{ width:50,textAlign:'center' }} placeholder="—" />
                   <button className="btn-danger" onClick={() => delNpc(npc.id)}>✕</button>
                 </div>
@@ -995,12 +1196,12 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
             <button className="btn-ghost" onClick={() => {setInitList([]);setCurrentTurn(0);}} style={{ fontSize:12 }}>クリア</button>
           </div>}
           <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:280, overflowY:'auto' }}>
-            {initList.length===0 && <div style={{ color:'#4a4438', fontSize:12, textAlign:'center', padding:'16px 0' }}>イニシアチブが未設定です</div>}
+            {initList.length===0 && <div style={{ color:'var(--tx3)', fontSize:12, textAlign:'center', padding:'16px 0' }}>イニシアチブが未設定です</div>}
             {initList.map((entry,i) => (
-              <div key={entry.id} className={i===currentTurn?'current-turn-row':''} style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:3,background:i===currentTurn?'#18180a':'#0d0d14',border:'1px solid '+(i===currentTurn?'#c9a84c':'#1e1a28') }}>
-                <span style={{ fontSize:i===currentTurn?14:11, color:i===currentTurn?'#c9a84c':'#4a4438', width:16, flexShrink:0 }}>{i===currentTurn?'▶':(i+1)}</span>
-                <span style={{ flex:1, fontSize:13, color:i===currentTurn?'#c9a84c':'#d4c9a8' }}>{entry.name}</span>
-                <span style={{ fontFamily:"'Cinzel', serif", color:'#7a7060', fontSize:14, width:32, textAlign:'right' }}>{entry.value}</span>
+              <div key={entry.id} className={i===currentTurn?'current-turn-row':''} style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:3,background:i===currentTurn?'var(--pb)':'var(--bg3)',border:'1px solid '+(i===currentTurn?'var(--ac)':'var(--bd)') }}>
+                <span style={{ fontSize:i===currentTurn?14:11, color:i===currentTurn?'var(--ac)':'var(--tx3)', width:16, flexShrink:0 }}>{i===currentTurn?'▶':(i+1)}</span>
+                <span style={{ flex:1, fontSize:13, color:i===currentTurn?'var(--ac)':'var(--tx)' }}>{entry.name}</span>
+                <span style={{ fontFamily:"'Cinzel', serif", color:'var(--tx2)', fontSize:14, width:32, textAlign:'right' }}>{entry.value}</span>
                 <button className="btn-ghost" onClick={() => delInit(entry.id)} style={{ padding:'2px 7px', fontSize:11 }}>✕</button>
               </div>
             ))}
@@ -1011,14 +1212,14 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
         <div className="section-title">一時的狂気</div>
         <div style={{ display:'flex', gap:14, alignItems:'flex-start', flexWrap:'wrap' }}>
           <button onClick={() => {setMadnessCard(MADNESS_CARDS[Math.floor(Math.random()*MADNESS_CARDS.length)]);setMadnessKey(k=>k+1);}}
-            style={{ background:'#160808',color:'#c42828',border:'1px solid #5a0a0a',padding:'10px 22px',fontSize:14,letterSpacing:'0.05em',fontFamily:"'Cinzel', serif",borderRadius:3,cursor:'pointer',flexShrink:0 }}
-            onMouseEnter={e=>{e.target.style.background='#220e0e';e.target.style.borderColor='#8b1a1a';}}
-            onMouseLeave={e=>{e.target.style.background='#160808';e.target.style.borderColor='#5a0a0a';}}>
+            style={{ background:'var(--re-bg)',color:'var(--re2)',border:'1px solid var(--re-b)',padding:'10px 22px',fontSize:14,letterSpacing:'0.05em',fontFamily:"'Cinzel', serif",borderRadius:3,cursor:'pointer',flexShrink:0 }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--re)';}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--re-b)';}}>
             ☠ 狂気カードを引く
           </button>
-          {madnessCard && <div key={madnessKey} className="madness-anim" style={{ flex:'1 1 240px',background:'#120808',border:'1px solid #4a0a0a',borderRadius:4,padding:'12px 16px' }}>
-            <div style={{ fontFamily:"'Cinzel', serif",color:'#c42828',fontSize:15,marginBottom:8,letterSpacing:'0.06em' }}>{madnessCard.title}</div>
-            <div style={{ fontSize:13,color:'#d4b0a8',lineHeight:1.75 }}>{madnessCard.desc}</div>
+          {madnessCard && <div key={madnessKey} className="madness-anim" style={{ flex:'1 1 240px',background:'var(--re-bg)',border:'1px solid var(--re-b)',borderRadius:4,padding:'12px 16px' }}>
+            <div style={{ fontFamily:"'Cinzel', serif",color:'var(--re2)',fontSize:15,marginBottom:8,letterSpacing:'0.06em' }}>{madnessCard.title}</div>
+            <div style={{ fontSize:13,color:'var(--tx)',lineHeight:1.75 }}>{madnessCard.desc}</div>
           </div>}
         </div>
       </div>
@@ -1095,7 +1296,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
       {/* Group selector */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: "'Cinzel', serif", color: '#6a8aaa', fontSize: 11, letterSpacing: '0.1em', flexShrink: 0 }}>セッション:</span>
+          <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--bl)', fontSize: 11, letterSpacing: '0.1em', flexShrink: 0 }}>セッション:</span>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', flex: 1 }}>
             {groups.map(g => (
               <button key={g.id} className={'group-tab' + (g.id === activeGroupId ? ' active' : '')} onClick={() => setActiveGroupId(g.id)}>
@@ -1112,10 +1313,10 @@ function GroupManager({ groups, setGroups, localCharacters }) {
 
         {showGroupImport && (
           <div className="import-box slide-in">
-            <div style={{ fontSize: 11, color: '#3d9a68', marginBottom: 8, fontFamily: "'Cinzel', serif" }}>📥 グループ共有テキストを貼り付け</div>
+            <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}>📥 グループ共有テキストを貼り付け</div>
             <textarea value={groupImportText} onChange={e => { setGroupImportText(e.target.value); setGroupImportErr(''); }}
               placeholder="━━━ CoC6 グループ... のテキストを貼り付け ━━━" rows={4} style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none' }} />
-            {groupImportErr && <div style={{ color: '#c42828', fontSize: 12, marginTop: 4 }}>{groupImportErr}</div>}
+            {groupImportErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 4 }}>{groupImportErr}</div>}
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button className="btn-green" onClick={importGroup} style={{ fontSize: 12 }}>インポートする</button>
               <button className="btn-ghost" onClick={() => { setShowGroupImport(false); setGroupImportText(''); setGroupImportErr(''); }} style={{ fontSize: 12 }}>閉じる</button>
@@ -1125,7 +1326,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
       </div>
 
       {!activeGroup && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#4a4438', fontFamily: "'Cinzel', serif", letterSpacing: '0.1em' }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--tx3)', fontFamily: "'Cinzel', serif", letterSpacing: '0.1em' }}>
           — ＋ 新規 でセッションを作成してください —
         </div>
       )}
@@ -1147,7 +1348,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
               <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>
-                メンバー <span style={{ fontSize: 10, color: '#4a4438', fontFamily: 'inherit', textTransform: 'none' }}>（{activeGroup.members.length}人）</span>
+                メンバー <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>（{activeGroup.members.length}人）</span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button className="btn-green" onClick={() => { setShowAddLocal(s=>!s); setShowImportMember(false); }} style={{ fontSize: 12 }}>
@@ -1161,7 +1362,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
 
             {showAddLocal && localCharacters.length > 0 && (
               <div className="import-box slide-in" style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: '#3d9a68', marginBottom: 8, fontFamily: "'Cinzel', serif" }}>追加する探索者を選択:</div>
+                <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}>追加する探索者を選択:</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {localCharacters.map(c => (
                     <button key={c.id} className="btn-primary" onClick={() => addLocalMember(c)} style={{ fontSize: 12 }}>
@@ -1175,10 +1376,10 @@ function GroupManager({ groups, setGroups, localCharacters }) {
 
             {showImportMember && (
               <div className="import-box slide-in" style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: '#6a8aaa', marginBottom: 8, fontFamily: "'Cinzel', serif" }}>📥 プレイヤーから受け取った探索者テキストを貼り付け:</div>
+                <div style={{ fontSize: 11, color: 'var(--bl)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}>📥 プレイヤーから受け取った探索者テキストを貼り付け:</div>
                 <textarea value={memberImportText} onChange={e => { setMemberImportText(e.target.value); setMemberImportErr(''); }}
                   placeholder="━━━ CoC6 探索者: ... のテキストを貼り付け ━━━" rows={4} style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none' }} />
-                {memberImportErr && <div style={{ color: '#c42828', fontSize: 12, marginTop: 4 }}>{memberImportErr}</div>}
+                {memberImportErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 4 }}>{memberImportErr}</div>}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button className="btn-green" onClick={importMember} style={{ fontSize: 12 }}>追加する</button>
                   <button className="btn-ghost" onClick={() => { setShowImportMember(false); setMemberImportText(''); setMemberImportErr(''); }} style={{ fontSize: 12 }}>閉じる</button>
@@ -1187,18 +1388,18 @@ function GroupManager({ groups, setGroups, localCharacters }) {
             )}
 
             {activeGroup.members.length === 0 && !showAddLocal && !showImportMember && (
-              <div style={{ color: '#4a4438', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ color: 'var(--tx3)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>
                 メンバーがいません。ローカルから追加するか、プレイヤーから共有テキストを受け取って追加してください。
               </div>
             )}
 
             <div className="member-grid">
               {activeGroup.members.map(member => (
-                <div key={member.id} style={{ background: '#0d0d14', border: '1px solid #1e1a28', borderRadius: 4, padding: '14px', position: 'relative' }}>
+                <div key={member.id} style={{ background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 4, padding: '14px', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontFamily: "'Cinzel', serif", color: '#c9a84c', fontSize: 15 }}>{member.name}</div>
-                      {member.snapshot.occupation && <div style={{ fontSize: 11, color: '#7a7060', marginTop: 2 }}>{member.snapshot.occupation}{member.snapshot.age ? '　' + member.snapshot.age + '歳' : ''}</div>}
+                      <div style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 15 }}>{member.name}</div>
+                      {member.snapshot.occupation && <div style={{ fontSize: 11, color: 'var(--tx2)', marginTop: 2 }}>{member.snapshot.occupation}{member.snapshot.age ? '　' + member.snapshot.age + '歳' : ''}</div>}
                     </div>
                     <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                       <button className="btn-ghost" onClick={() => setViewingMember(member)} style={{ fontSize: 11 }}>詳細</button>
@@ -1207,13 +1408,13 @@ function GroupManager({ groups, setGroups, localCharacters }) {
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                    <StatTracker label="HP" current={member.hp} max={member.maxHP} color="#3d9a68"
+                    <StatTracker label="HP" current={member.hp} max={member.maxHP} color="var(--gr)"
                       onDecrement={() => upMember(member.id,'hp',clamp(member.hp-1,0,member.maxHP))}
                       onIncrement={() => upMember(member.id,'hp',clamp(member.hp+1,0,member.maxHP))} />
-                    <StatTracker label="MP" current={member.mp} max={member.maxMP} color="#4a7aaa"
+                    <StatTracker label="MP" current={member.mp} max={member.maxMP} color="var(--bl)"
                       onDecrement={() => upMember(member.id,'mp',clamp(member.mp-1,0,member.maxMP))}
                       onIncrement={() => upMember(member.id,'mp',clamp(member.mp+1,0,member.maxMP))} />
-                    <StatTracker label="SAN" current={member.san} max={member.maxSAN} color="#c9a84c"
+                    <StatTracker label="SAN" current={member.san} max={member.maxSAN} color="var(--ac)"
                       onDecrement={() => upMember(member.id,'san',clamp(member.san-1,0,member.maxSAN))}
                       onIncrement={() => upMember(member.id,'san',clamp(member.san+1,0,member.maxSAN))} />
                   </div>
@@ -1231,7 +1432,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
           {/* Group Share */}
           <div className="card">
             <div className="section-title">グループ共有</div>
-            <div style={{ fontSize: 12, color: '#7a7060', marginBottom: 12, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 12, color: 'var(--tx2)', marginBottom: 12, lineHeight: 1.7 }}>
               グループ全体（メンバーのキャラデータ・ストーリー・ログ含む）をテキストにエクスポートします。<br/>
               受け取った側は「📥 インポート」に貼り付けることでグループを復元できます。
             </div>
@@ -1239,7 +1440,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
               <CopyButton text={groupShareText} label="📋 グループをコピー" />
             </div>
             <textarea readOnly value={groupShareText} rows={4} onClick={e => e.target.select()}
-              style={{ width: '100%', marginTop: 10, fontSize: 10, fontFamily: 'monospace', background: '#04060e', color: '#8aaaca', border: '1px solid #1a2a4a', resize: 'none' }} />
+              style={{ width: '100%', marginTop: 10, fontSize: 10, fontFamily: 'monospace', background: 'var(--bg)', color: 'var(--bl)', border: '1px solid var(--bl-b)', resize: 'none' }} />
           </div>
         </>
       )}
@@ -1264,27 +1465,27 @@ function Bestiary() {
       <div className="creature-grid">
         {filtered.map(c => (
           <div key={c.nameEN} className="creature-card">
-            <div style={{ background: '#0d0d14', borderBottom: '1px solid #1e1a28', padding: '12px 16px' }}>
-              <div style={{ fontFamily: "'Cinzel', serif", color: '#c9a84c', fontSize: 16, letterSpacing: '0.04em' }}>{c.nameJP}</div>
-              <div style={{ color: '#4a4438', fontSize: 11, marginTop: 2, letterSpacing: '0.1em' }}>{c.nameEN}</div>
+            <div style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--bd)', padding: '12px 16px' }}>
+              <div style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 16, letterSpacing: '0.04em' }}>{c.nameJP}</div>
+              <div style={{ color: 'var(--tx3)', fontSize: 11, marginTop: 2, letterSpacing: '0.1em' }}>{c.nameEN}</div>
             </div>
             <div style={{ padding: '12px 16px' }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                 {[['STR',c.STR],['CON',c.CON],['SIZ',c.SIZ],['DEX',c.DEX],['HP',c.HP]].map(([s,v]) => (
                   <div key={s} style={{ textAlign:'center',minWidth:42 }}>
-                    <div style={{ fontFamily:"'Cinzel', serif",fontSize:9,color:'#7a7060' }}>{s}</div>
-                    <div style={{ fontFamily:"'Cinzel', serif",fontSize:16,color:'#d4c9a8' }}>{v}</div>
+                    <div style={{ fontFamily:"'Cinzel', serif",fontSize:9,color:'var(--tx2)' }}>{s}</div>
+                    <div style={{ fontFamily:"'Cinzel', serif",fontSize:16,color:'var(--tx)' }}>{v}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ marginBottom:6 }}><span style={{ fontSize:10,color:'#7a7060',fontFamily:"'Cinzel', serif" }}>攻撃  </span><span style={{ fontSize:12,color:'#d4c9a8' }}>{c.attack}</span></div>
-              <div style={{ marginBottom:10 }}><span style={{ fontSize:10,color:'#7a7060',fontFamily:"'Cinzel', serif" }}>SAN減少  </span><span style={{ fontSize:13,color:'#c42828',fontFamily:"'Cinzel', serif" }}>{c.sanLoss}</span></div>
-              <div style={{ fontSize:11,color:'#7a7060',fontStyle:'italic',lineHeight:1.7,borderTop:'1px solid #1a1620',paddingTop:10 }}>{c.flavor}</div>
+              <div style={{ marginBottom:6 }}><span style={{ fontSize:10,color:'var(--tx2)',fontFamily:"'Cinzel', serif" }}>攻撃  </span><span style={{ fontSize:12,color:'var(--tx)' }}>{c.attack}</span></div>
+              <div style={{ marginBottom:10 }}><span style={{ fontSize:10,color:'var(--tx2)',fontFamily:"'Cinzel', serif" }}>SAN減少  </span><span style={{ fontSize:13,color:'var(--re2)',fontFamily:"'Cinzel', serif" }}>{c.sanLoss}</span></div>
+              <div style={{ fontSize:11,color:'var(--tx2)',fontStyle:'italic',lineHeight:1.7,borderTop:'1px solid var(--bd)',paddingTop:10 }}>{c.flavor}</div>
             </div>
           </div>
         ))}
       </div>
-      {filtered.length===0 && <div style={{ textAlign:'center',color:'#4a4438',padding:'60px 0',fontFamily:"'Cinzel', serif",letterSpacing:'0.12em',fontSize:13 }}>— 該当する神話生物は見つかりませんでした —</div>}
+      {filtered.length===0 && <div style={{ textAlign:'center',color:'var(--tx3)',padding:'60px 0',fontFamily:"'Cinzel', serif",letterSpacing:'0.12em',fontSize:13 }}>— 該当する神話生物は見つかりませんでした —</div>}
     </div>
   );
 }
@@ -1303,6 +1504,13 @@ const TABS = [
 
 function App() {
   const [activeTab, setActiveTab] = useState('character');
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('coc6-theme') || 'dark'; } catch { return 'dark'; }
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('coc6-theme', theme); } catch {}
+  }, [theme]);
 
   const [characters, setCharacters] = useState(() => {
     try { const s = JSON.parse(localStorage.getItem('coc6-characters')); if (Array.isArray(s)&&s.length>0) return s; } catch {}
@@ -1343,10 +1551,16 @@ function App() {
     <>
       <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       <div style={{ minHeight: '100vh' }}>
-        <header style={{ background: 'linear-gradient(180deg, #070710 0%, #0a0a0f 100%)', borderBottom: '1px solid #1e1a28', padding: '14px 20px 0', position: 'sticky', top: 0, zIndex: 100 }}>
-          <h1 className="app-title" style={{ fontFamily: "'Cinzel', serif", color: '#c9a84c', fontSize: 'clamp(13px, 2.6vw, 20px)', letterSpacing: '0.18em', marginBottom: 14, fontWeight: 400 }}>
-            ✦ CALL OF CTHULHU — 6th Edition ✦
-          </h1>
+        <header style={{ background: 'linear-gradient(180deg, var(--head) 0%, var(--bg) 100%)', borderBottom: '1px solid var(--bd)', padding: '14px 20px 0', position: 'sticky', top: 0, zIndex: 100 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <h1 className="app-title" style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 'clamp(13px, 2.6vw, 20px)', letterSpacing: '0.18em', fontWeight: 400 }}>
+              ✦ CALL OF CTHULHU — 6th Edition ✦
+            </h1>
+            <button className="btn-theme" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+              style={{ fontSize: 12, padding: '5px 12px', flexShrink: 0 }}>
+              {theme === 'dark' ? '☀ ライト' : '🌙 ダーク'}
+            </button>
+          </div>
           <nav className="tab-bar">
             {TABS.map(tab => (
               <button key={tab.key} className={'tab-btn'+(activeTab===tab.key?' active':'')} onClick={() => setActiveTab(tab.key)}>
