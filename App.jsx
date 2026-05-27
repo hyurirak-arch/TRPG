@@ -937,7 +937,12 @@ function CharacterSheet({ character, onChange }) {
 
       {/* Skills */}
       <div className="card">
-        <div className="section-title">技能リスト <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>基本値 → 現在値</span></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>
+            技能リスト <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>基本値 → 現在値</span>
+          </div>
+          <button className="btn-primary" onClick={addCustomSkill} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 技能追加</button>
+        </div>
         <div className="skills-grid">
           {COC6_SKILLS.map(skill => {
             const base = skill.base === 'DEX×2' ? abilities.DEX * 2 : skill.base;
@@ -952,6 +957,22 @@ function CharacterSheet({ character, onChange }) {
             );
           })}
         </div>
+        {(character.customSkills||[]).length > 0 && (
+          <div style={{ borderTop: '1px solid var(--bd)', marginTop: 10, paddingTop: 10 }}>
+            <div className="skills-grid">
+              {(character.customSkills||[]).map(sk => (
+                <div key={sk.id} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
+                  <input value={sk.label} onChange={e => upCustomSkill(sk.id,'label',e.target.value)}
+                    placeholder="技能名…" style={{ flex: 1, fontSize: 12, background: 'transparent', border: 'none', outline: 'none', color: 'var(--tx)', padding: 0 }} />
+                  <input type="number" min="0" max="99" value={sk.value} onChange={e => upCustomSkill(sk.id,'value',Math.max(0,parseInt(e.target.value)||0))}
+                    style={{ width: 44, textAlign: 'center', padding: '3px 4px', fontSize: 13, lineHeight: '1.4' }} />
+                  <button onClick={() => delCustomSkill(sk.id)}
+                    style={{ background: 'transparent', color: 'var(--tx3)', border: 'none', fontSize: 12, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Weapons */}
@@ -989,29 +1010,6 @@ function CharacterSheet({ character, onChange }) {
             <input type="number" value={e.qty} onChange={ev => upEquip(e.id,'qty',ev.target.value)} placeholder="1" style={{ width: 44, textAlign: 'center' }} />
             <input value={e.memo} onChange={ev => upEquip(e.id,'memo',ev.target.value)} placeholder="メモ" style={{ flex: '3 1 110px', minWidth: 80 }} />
             <button className="btn-danger" onClick={() => delEquip(e.id)}>✕</button>
-          </div>
-        ))}
-      </div>
-
-      {/* Custom Skills */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>
-            カスタム技能 <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>自分で技能を追加</span>
-          </div>
-          <button className="btn-primary" onClick={addCustomSkill} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
-        </div>
-        {(character.customSkills||[]).length === 0 && (
-          <div style={{ color: 'var(--tx3)', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>＋ 追加 でオリジナル技能を登録できます</div>
-        )}
-        {(character.customSkills||[]).map(sk => (
-          <div key={sk.id} className="custom-skill-row">
-            <input value={sk.label} onChange={e => upCustomSkill(sk.id,'label',e.target.value)}
-              placeholder="技能名（例：古代語、手品…）" style={{ flex: '3 1 140px', minWidth: 100 }} />
-            <input type="number" min="0" max="99" value={sk.value} onChange={e => upCustomSkill(sk.id,'value',Math.max(0,parseInt(e.target.value)||0))}
-              style={{ width: 52, textAlign: 'center', fontSize: 13 }} />
-            <span style={{ fontSize: 11, color: 'var(--tx3)' }}>%</span>
-            <button className="btn-danger" onClick={() => delCustomSkill(sk.id)}>✕</button>
           </div>
         ))}
       </div>
