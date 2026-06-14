@@ -69,6 +69,7 @@ function createCharacter(override) {
     temporaryInsanity: false, indefiniteInsanity: false,
     skills: { ...DEFAULT_SKILLS },
     customSkills: [],
+    bonuses: { HP: 0, MP: 0, STR: 0, CON: 0, SIZ: 0, DEX: 0, APP: 0, INT: 0, POW: 0, EDU: 0, skills: [] },
     weapons: [], equipment: [], imageData: null, sketchData: null,
     ...(override || {}),
   };
@@ -140,6 +141,30 @@ const MADNESS_CARDS = [
   { title: '逃走衝動',       desc: '目の前の恐怖から逃れるためにひたすら走り続ける。制止しようとする者にも攻撃する。' },
   { title: '昏迷',           desc: '呆然と立ち尽くし、周囲に一切反応しなくなる。1d10分後にようやく我に返る。' },
   { title: '攻撃衝動',       desc: '最も近くにいる存在（仲間も含む）を突然攻撃し始める。止めるには物理的な拘束が必要だ。' },
+];
+
+const WEAPON_PRESETS = [
+  { cat: '近接', items: [
+    { name: '素手',         skill: '素手',           damage: '1d3+db',    attacks: '1', ammo: '', malfunction: '', memo: '' },
+    { name: 'ナイフ',       skill: 'ナイフ',         damage: '1d4+2',     attacks: '1', ammo: '', malfunction: '', memo: '' },
+    { name: 'こん棒',       skill: 'こん棒',         damage: '1d8+db',    attacks: '1', ammo: '', malfunction: '', memo: '' },
+    { name: '斧',           skill: '斧',             damage: '1d8+2+db',  attacks: '1', ammo: '', malfunction: '', memo: '' },
+    { name: '日本刀',       skill: '刀剣',           damage: '1d10+1+db', attacks: '1', ammo: '', malfunction: '', memo: '' },
+    { name: 'スピア',       skill: '槍',             damage: '1d8+1+db',  attacks: '1', ammo: '', malfunction: '', memo: '' },
+  ]},
+  { cat: '拳銃', items: [
+    { name: '.22拳銃',       skill: '拳銃', damage: '1d6',    attacks: '1', ammo: '9',  malfunction: '99',  memo: '' },
+    { name: '.32拳銃',       skill: '拳銃', damage: '1d8',    attacks: '1', ammo: '6',  malfunction: '99',  memo: '' },
+    { name: '.38リボルバー', skill: '拳銃', damage: '1d10',   attacks: '1', ammo: '6',  malfunction: '99',  memo: '' },
+    { name: '.45オート',     skill: '拳銃', damage: '1d10+2', attacks: '1', ammo: '7',  malfunction: '99',  memo: '' },
+    { name: '9mmルガー',     skill: '拳銃', damage: '1d10',   attacks: '1', ammo: '8',  malfunction: '99',  memo: '' },
+  ]},
+  { cat: '長物', items: [
+    { name: 'ショットガン',    skill: 'ショットガン',   damage: '4d6/2d6', attacks: '1', ammo: '2',  malfunction: '100', memo: '近/遠' },
+    { name: 'ライフル',        skill: 'ライフル',       damage: '2d6+4',   attacks: '1', ammo: '5',  malfunction: '99',  memo: '' },
+    { name: 'トミーガン',      skill: 'サブマシンガン', damage: '1d10+2',  attacks: '3', ammo: '30', malfunction: '96',  memo: '' },
+    { name: 'ウィンチェスター', skill: 'ライフル',      damage: '2d6+1',   attacks: '1', ammo: '7',  malfunction: '99',  memo: '' },
+  ]},
 ];
 
 // ============================================================
@@ -286,12 +311,12 @@ const GLOBAL_CSS = `
   /* ===== CSS VARIABLES ===== */
   :root {
     --bg:#0a0a0f; --bg2:#111118; --bg3:#0d0d14;
-    --tx:#d4c9a8; --tx2:#7a7060; --tx3:#4a4438;
+    --tx:#d4c9a8; --tx2:#c8b888; --tx3:#8a7a60;
     --ac:#c9a84c; --pac:#4a3e20;
     --re:#8b1a1a; --re2:#c42828; --re-b:#3a0a0a; --re-bg:#160808;
     --gr:#3d9a68; --gr-b:#1a3a1a; --gr-bg:#081408;
     --bl:#4a7aaa; --bl-b:#1a2a4a; --bl-bg:#0a0e1a;
-    --bd:#1e1a28; --bd2:#2a2530; --scr:#2d4a3e;
+    --bd:#302848; --bd2:#3e3458; --scr:#2d4a3e;
     --pb:#181810; --head:#070710;
   }
   :root[data-theme="light"] {
@@ -353,7 +378,7 @@ const GLOBAL_CSS = `
   .btn-theme { background: var(--bg3); color: var(--tx2); border: 1px solid var(--bd2); padding: 5px 12px; font-size: 12px; border-radius: 3px; }
   .btn-theme:hover { color: var(--ac); border-color: var(--pac); }
 
-  .section-title { font-family: 'Cinzel', serif; color: var(--ac); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; border-bottom: 1px solid var(--bd); padding-bottom: 8px; margin-bottom: 14px; }
+  .section-title { font-family: 'Cinzel', serif; color: var(--ac); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; border-bottom: 1px solid var(--bd); padding-bottom: 8px; margin-bottom: 14px; }
   .card { background: var(--bg2); border: 1px solid var(--bd); border-radius: 4px; padding: 16px; margin-bottom: 14px; }
 
   .tab-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid var(--bd); }
@@ -422,7 +447,7 @@ const GLOBAL_CSS = `
 // LEAF COMPONENTS
 // ============================================================
 
-const LBL = { display: 'block', fontSize: 10, color: 'var(--tx2)', marginBottom: 4, letterSpacing: '0.1em', fontFamily: "'Cinzel', serif", textTransform: 'uppercase' };
+const LBL = { display: 'block', fontSize: 12, color: 'var(--tx2)', marginBottom: 4, letterSpacing: '0.1em', fontFamily: "'Cinzel', serif", textTransform: 'uppercase' };
 
 function LabeledInput({ label, value, onChange, type, placeholder, style }) {
   return (
@@ -446,11 +471,11 @@ function AbilityRow({ label, value, onChange, flash }) {
   return (
     <div className={flash ? 'random-flash' : ''}
       style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '5px 10px' }}>
-      <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 12, width: 32, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 13, width: 32, flexShrink: 0 }}>{label}</span>
       <input type="number" min="0" max="99" value={value} onChange={onChange}
-        style={{ width: 50, textAlign: 'center', fontSize: 14, padding: '4px 6px', lineHeight: '1.4' }} />
-      <span style={{ color: 'var(--tx3)', fontSize: 10, flexShrink: 0 }}>×5</span>
-      <span style={{ color: 'var(--tx)', fontSize: 13, minWidth: 28, textAlign: 'right' }}>{value * 5}</span>
+        style={{ width: 50, textAlign: 'center', fontSize: 15, padding: '4px 6px', lineHeight: '1.4' }} />
+      <span style={{ color: 'var(--tx3)', fontSize: 11, flexShrink: 0 }}>×5</span>
+      <span style={{ color: 'var(--tx)', fontSize: 14, minWidth: 28, textAlign: 'right' }}>{value * 5}</span>
     </div>
   );
 }
@@ -784,6 +809,7 @@ function CharDetailModal({ member, onClose }) {
 
 function CharacterSheet({ character, onChange }) {
   const [randomFlash, setRandomFlash] = useState(null);
+  const [showPreset,  setShowPreset]  = useState(false);
   const fileRef = useRef(null);
 
   const set = (field, val) => onChange(prev => ({ ...prev, [field]: val }));
@@ -809,9 +835,26 @@ function CharacterSheet({ character, onChange }) {
   };
 
   const { abilities, currentHP, currentMP, currentSAN, skills, weapons = [], equipment = [] } = character;
-  const { maxHP, maxMP, maxSAN } = calcMaxStats(abilities);
+  const bonuses = character.bonuses || { HP: 0, MP: 0, STR: 0, CON: 0, SIZ: 0, DEX: 0, APP: 0, INT: 0, POW: 0, EDU: 0, skills: [] };
+  const setBonus = (key, val) => onChange(prev => ({ ...prev, bonuses: { ...(prev.bonuses||{}), [key]: val } }));
+  const addBonusSkill = () => onChange(prev => ({ ...prev, bonuses: { ...(prev.bonuses||{}), skills: [...((prev.bonuses||{}).skills||[]), { id: uid(), label: '', value: 0 }] } }));
+  const upBonusSkill  = (id, f, v) => onChange(prev => ({ ...prev, bonuses: { ...(prev.bonuses||{}), skills: ((prev.bonuses||{}).skills||[]).map(s => s.id===id ? {...s,[f]:v} : s) } }));
+  const delBonusSkill = (id) => onChange(prev => ({ ...prev, bonuses: { ...(prev.bonuses||{}), skills: ((prev.bonuses||{}).skills||[]).filter(s => s.id!==id) } }));
+
+  const { maxHP: baseMaxHP, maxMP: baseMaxMP, maxSAN } = calcMaxStats(abilities);
+  const maxHP = baseMaxHP + (bonuses.HP || 0);
+  const maxMP = baseMaxMP + (bonuses.MP || 0);
   const dmgBonus = calcDmgBonus(abilities.STR, abilities.SIZ);
   const occFormula = OCC_FORMULAS.find(f => f.key === character.occupationFormula) || OCC_FORMULAS[0];
+
+  const occTotal = occFormula.calc(abilities);
+  const intTotal = abilities.INT * 10;
+  const usedSkillPoints = COC6_SKILLS.reduce((total, skill) => {
+    const base = skill.base === 'DEX×2' ? abilities.DEX * 2 : (typeof skill.base === 'number' ? skill.base : 0);
+    const cur = skills[skill.key] !== undefined ? skills[skill.key] : base;
+    return total + Math.max(0, cur - base);
+  }, 0) + (character.customSkills||[]).reduce((total, sk) => total + (sk.value||0), 0);
+  const remainingPoints = occTotal + intTotal - usedSkillPoints;
 
   const addWeapon = () => onChange(prev => ({ ...prev, weapons: [...(prev.weapons||[]), { id: uid(), name:'', skill:'', damage:'', attacks:'1', ammo:'', malfunction:'', memo:'' }] }));
   const upWeapon  = (id, f, v) => onChange(prev => ({ ...prev, weapons: (prev.weapons||[]).map(w => w.id===id ? {...w,[f]:v} : w) }));
@@ -937,11 +980,17 @@ function CharacterSheet({ character, onChange }) {
 
       {/* Skills */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>
             技能リスト <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>基本値 → 現在値</span>
           </div>
           <button className="btn-primary" onClick={addCustomSkill} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 技能追加</button>
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, marginBottom: 14, padding: '6px 10px', background: 'var(--bg3)', borderRadius: 3, border: '1px solid var(--bd)', alignItems: 'center' }}>
+          <span style={{ color: 'var(--tx3)' }}>職業P: <span style={{ color: 'var(--gr)', fontFamily: "'Cinzel', serif" }}>{occTotal}</span></span>
+          <span style={{ color: 'var(--tx3)' }}>趣味P: <span style={{ color: 'var(--bl)', fontFamily: "'Cinzel', serif" }}>{intTotal}</span></span>
+          <span style={{ color: 'var(--tx3)', marginLeft: 'auto' }}>配分済み: <span style={{ color: remainingPoints < 0 ? 'var(--re2)' : 'var(--ac)', fontFamily: "'Cinzel', serif" }}>{usedSkillPoints}</span><span style={{ color: 'var(--tx3)' }}> / {occTotal + intTotal}</span></span>
+          <span style={{ color: 'var(--tx3)' }}>残り: <span style={{ color: remainingPoints < 0 ? 'var(--re2)' : 'var(--gr)', fontFamily: "'Cinzel', serif" }}>{remainingPoints}</span></span>
         </div>
         <div className="skills-grid">
           {COC6_SKILLS.map(skill => {
@@ -949,10 +998,10 @@ function CharacterSheet({ character, onChange }) {
             const cur  = skills[skill.key] !== undefined ? skills[skill.key] : (typeof base === 'number' ? base : 0);
             return (
               <div key={skill.key} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
-                <span style={{ flex: 1, fontSize: 12, color: 'var(--tx)' }}>{skill.label}</span>
-                <span style={{ fontSize: 10, color: 'var(--tx3)', width: 24, textAlign: 'right', flexShrink: 0 }}>{base}</span>
+                <span style={{ flex: 1, fontSize: 13, color: 'var(--tx)' }}>{skill.label}</span>
+                <span style={{ fontSize: 11, color: 'var(--tx3)', width: 26, textAlign: 'right', flexShrink: 0 }}>{base}</span>
                 <input type="number" min="0" max="99" value={cur} onChange={e => setSkill(skill.key, e.target.value)}
-                  style={{ width: 44, textAlign: 'center', padding: '3px 4px', fontSize: 13, lineHeight: '1.4' }} />
+                  style={{ width: 46, textAlign: 'center', padding: '3px 4px', fontSize: 14, lineHeight: '1.4' }} />
               </div>
             );
           })}
@@ -979,8 +1028,32 @@ function CharacterSheet({ character, onChange }) {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>武器・攻撃</div>
-          <button className="btn-primary" onClick={addWeapon} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn-ghost" onClick={() => setShowPreset(s => !s)} style={{ fontSize: 12 }}>📋 プリセット</button>
+            <button className="btn-primary" onClick={addWeapon} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
+          </div>
         </div>
+        {showPreset && (
+          <div className="slide-in" style={{ background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 4, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: 'var(--tx2)', marginBottom: 10, fontFamily: "'Cinzel', serif", letterSpacing: '0.08em' }}>追加する武器を選択</div>
+            {WEAPON_PRESETS.map(cat => (
+              <div key={cat.cat} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: "'Cinzel', serif", letterSpacing: '0.1em', marginBottom: 5 }}>{cat.cat}</div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {cat.items.map(w => (
+                    <button key={w.name} className="btn-ghost"
+                      onClick={() => onChange(prev => ({ ...prev, weapons: [...(prev.weapons||[]), { id: uid(), ...w }] }))}
+                      style={{ fontSize: 12, padding: '4px 10px' }}>
+                      {w.name}
+                      <span style={{ fontSize: 10, color: 'var(--tx3)', marginLeft: 5 }}>{w.damage}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button className="btn-ghost" onClick={() => setShowPreset(false)} style={{ fontSize: 11, marginTop: 4 }}>閉じる</button>
+          </div>
+        )}
         {weapons.length === 0 && <div style={{ color: 'var(--tx3)', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>武器が登録されていません</div>}
         {weapons.map(w => (
           <div key={w.id} className="weapon-row">
@@ -1012,6 +1085,62 @@ function CharacterSheet({ character, onChange }) {
             <button className="btn-danger" onClick={() => delEquip(e.id)}>✕</button>
           </div>
         ))}
+      </div>
+
+      {/* Temporary Bonuses */}
+      <div className="card">
+        <div className="section-title">一時的ボーナス</div>
+        <div style={{ fontSize: 11, color: 'var(--tx3)', marginBottom: 12 }}>アイテム・呪文などによる一時的な増加分を記録します</div>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+          {[['HP', 'var(--gr)'], ['MP', 'var(--bl)']].map(([key, col]) => (
+            <div key={key} style={{ background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '8px 12px', minWidth: 110 }}>
+              <div style={{ fontSize: 10, color: col, fontFamily: "'Cinzel', serif", marginBottom: 5 }}>{key} ボーナス</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 13, color: 'var(--tx3)' }}>+</span>
+                <input type="number" min="0" value={bonuses[key]||0} onChange={e => setBonus(key, Math.max(0, parseInt(e.target.value)||0))}
+                  style={{ width: 54, textAlign: 'center', padding: '4px 6px', fontSize: 14 }} />
+                {(bonuses[key]||0) > 0 && <span style={{ fontSize: 11, color: col }}>→ {key==='HP' ? maxHP : maxMP}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 10, color: 'var(--tx2)', fontFamily: "'Cinzel', serif", letterSpacing: '0.08em', marginBottom: 8 }}>能力値ボーナス</div>
+          <div className="abilities-grid">
+            {Object.keys(ABILITY_ROLL).map(ab => (
+              <div key={ab} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '5px 10px' }}>
+                <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 12, width: 32, flexShrink: 0 }}>{ab}</span>
+                <span style={{ fontSize: 11, color: 'var(--tx3)' }}>+</span>
+                <input type="number" min="0" value={bonuses[ab]||0} onChange={e => setBonus(ab, Math.max(0, parseInt(e.target.value)||0))}
+                  style={{ width: 40, textAlign: 'center', padding: '3px 5px', fontSize: 13 }} />
+                {(bonuses[ab]||0) > 0 && <span style={{ fontSize: 11, color: 'var(--gr)', marginLeft: 2 }}>{abilities[ab]} → <span style={{ fontFamily: "'Cinzel', serif" }}>{abilities[ab] + (bonuses[ab]||0)}</span></span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: 'var(--tx2)', fontFamily: "'Cinzel', serif", letterSpacing: '0.08em' }}>技能ボーナス</div>
+            <button className="btn-primary" onClick={addBonusSkill} style={{ fontSize: 11, padding: '3px 10px' }}>＋ 追加</button>
+          </div>
+          {(bonuses.skills||[]).length === 0 && <div style={{ fontSize: 12, color: 'var(--tx3)', textAlign: 'center', padding: '8px 0' }}>技能ボーナスなし</div>}
+          <div className="skills-grid">
+            {(bonuses.skills||[]).map(sk => (
+              <div key={sk.id} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
+                <input value={sk.label} onChange={e => upBonusSkill(sk.id,'label',e.target.value)}
+                  placeholder="技能名…" style={{ flex: 1, fontSize: 12, background: 'transparent', border: 'none', outline: 'none', color: 'var(--tx)', padding: 0 }} />
+                <span style={{ fontSize: 11, color: 'var(--tx3)' }}>+</span>
+                <input type="number" min="0" value={sk.value||0} onChange={e => upBonusSkill(sk.id,'value',Math.max(0,parseInt(e.target.value)||0))}
+                  style={{ width: 44, textAlign: 'center', padding: '3px 4px', fontSize: 13 }} />
+                <button onClick={() => delBonusSkill(sk.id)}
+                  style={{ background: 'transparent', color: 'var(--tx3)', border: 'none', fontSize: 12, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Sketch Memo */}
@@ -1457,6 +1586,9 @@ function Bestiary() {
   const filtered = CREATURES.filter(c => c.nameJP.includes(q) || c.nameEN.toLowerCase().includes(q.toLowerCase()));
   return (
     <div style={{ padding: '16px 20px', maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ fontSize: 12, color: 'var(--tx2)', background: 'var(--bg2)', border: '1px solid var(--bd)', borderRadius: 3, padding: '9px 14px', marginBottom: 14, lineHeight: 1.9 }}>
+        <span style={{ color: 'var(--ac)' }}>⚠</span> このデータはChaosium社 CoC 6版ルールブック等の学習情報をもとにAIが生成した参考値です。数値は公式資料（<span style={{ fontStyle: 'italic', color: 'var(--tx)' }}>Malleus Monstrorum</span> 等）と異なる場合があります。ゲームでご使用の際は必ず公式資料でご確認ください。
+      </div>
       <div style={{ marginBottom: 18 }}>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="神話生物を検索（日本語・英語）..." style={{ width: '100%', maxWidth: 420, padding: '8px 14px', fontSize: 14 }} />
       </div>
