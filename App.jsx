@@ -389,6 +389,7 @@ const GLOBAL_CSS = `
   .info-grid      { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0 14px; }
   .session-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
   .member-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .dice-grid      { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 
   .creature-card { background: var(--bg2); border: 1px solid var(--bd); border-radius: 4px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
   .creature-card:hover { border-color: var(--pac); box-shadow: 0 0 14px rgba(201,168,76,0.07); }
@@ -437,6 +438,7 @@ const GLOBAL_CSS = `
     .info-grid      { grid-template-columns: 1fr 1fr; }
     .session-grid   { grid-template-columns: 1fr; }
     .member-grid    { grid-template-columns: 1fr; }
+    .dice-grid      { grid-template-columns: 1fr; }
     .tab-btn        { padding: 6px 10px; font-size: 11px; }
     .card           { padding: 12px; }
   }
@@ -994,14 +996,18 @@ function CharacterSheet({ character, onChange }) {
         </div>
         <div className="skills-grid">
           {COC6_SKILLS.map(skill => {
-            const base = skill.base === 'DEX×2' ? abilities.DEX * 2 : skill.base;
-            const cur  = skills[skill.key] !== undefined ? skills[skill.key] : (typeof base === 'number' ? base : 0);
+            const base    = skill.base === 'DEX×2' ? abilities.DEX * 2 : skill.base;
+            const numBase = typeof base === 'number' ? base : 0;
+            const cur     = skills[skill.key] !== undefined ? skills[skill.key] : numBase;
+            const added   = Math.max(0, cur - numBase);
             return (
-              <div key={skill.key} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
+              <div key={skill.key} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
                 <span style={{ flex: 1, fontSize: 13, color: 'var(--tx)' }}>{skill.label}</span>
-                <span style={{ fontSize: 11, color: 'var(--tx3)', width: 26, textAlign: 'right', flexShrink: 0 }}>{base}</span>
-                <input type="number" min="0" max="99" value={cur} onChange={e => setSkill(skill.key, e.target.value)}
-                  style={{ width: 46, textAlign: 'center', padding: '3px 4px', fontSize: 14, lineHeight: '1.4' }} />
+                <span style={{ fontSize: 15, color: 'var(--ac)', fontFamily: "'Cinzel', serif", width: 32, textAlign: 'right', flexShrink: 0 }}>{cur}</span>
+                <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0, whiteSpace: 'nowrap' }}>{base}+</span>
+                <input type="number" min="0" value={added}
+                  onChange={e => setSkill(skill.key, numBase + Math.max(0, parseInt(e.target.value) || 0))}
+                  style={{ width: 42, textAlign: 'center', padding: '3px 4px', fontSize: 13, lineHeight: '1.4' }} />
               </div>
             );
           })}
@@ -1188,75 +1194,89 @@ function DiceRoller() {
   const resultColor = rollResult ? (rollResult.judgment ? (J_COLORS[rollResult.judgment.cls]||'var(--tx)') : 'var(--ac)') : 'var(--ac)';
 
   return (
-    <div style={{ padding: '16px 20px', maxWidth: 800, margin: '0 auto' }}>
-      <div className="card">
-        <div className="section-title">クイックロール</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--bd2)', borderRadius: 3, padding: '5px 10px' }}>
-            <span style={{ fontSize: 11, color: 'var(--tx2)', fontFamily: "'Cinzel', serif" }}>個数:</span>
-            <input type="number" min="1" max="20" value={diceCount} onChange={e => setDiceCount(Math.max(1,Math.min(20,parseInt(e.target.value)||1)))}
-              style={{ width: 44, textAlign: 'center', padding: '3px 5px', lineHeight: '1.4' }} />
-          </div>
-          {[4,6,8,10,12,20,100].map(d => (
-            <button key={d} className="btn-primary" onClick={() => doRoll(n+'d'+d, n+'d'+d)}
-              style={{ fontFamily: "'Cinzel', serif", padding: '7px 13px', fontSize: 13 }}>{n}d{d}</button>
-          ))}
-        </div>
-      </div>
+    <div style={{ padding: '16px 20px', maxWidth: 960, margin: '0 auto' }}>
+      <div className="dice-grid">
 
-      <div className="card">
-        <div className="section-title">カスタムロール</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div>
-            <label style={LBL}>ダイス記法</label>
-            <input value={customExpr} onChange={e => setCustomExpr(e.target.value)} onKeyDown={e => e.key==='Enter'&&doRoll(customExpr)} placeholder="3d6+5" style={{ width: 150 }} />
-          </div>
-          <button className="btn-primary" onClick={() => doRoll(customExpr)}>ロール</button>
-        </div>
-        {customErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 8 }}>{customErr}</div>}
-      </div>
-
-      <div className="card">
-        <div className="section-title">技能判定（d100）</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 10 }}>
-          <div>
-            <label style={LBL}>技能値 (%)</label>
-            <input type="number" min="0" max="100" value={skillPct} onChange={e => setSkillPct(e.target.value)} onKeyDown={e => e.key==='Enter'&&doSkillCheck()} placeholder="例: 65" style={{ width: 100 }} />
-          </div>
-          <button className="btn-primary" onClick={doSkillCheck}>判定</button>
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--tx3)', lineHeight: 1.9 }}>
-          <span style={{ color: 'var(--ac)' }}>イマジナリー</span>: ≤値÷5　<span style={{ color: 'var(--gr)' }}>困難成功</span>: ≤値÷2　<span style={{ color: 'var(--gr)' }}>通常成功</span>: ≤値　<span style={{ color: 'var(--re2)' }}>ファンブル</span>: 96〜100(値&lt;50)/100(値≥50)
-        </div>
-      </div>
-
-      {rollResult && (
-        <div className="card" key={rollResult.id}>
-          <div className="section-title">結果</div>
-          <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
-            {rollResult.label && <div style={{ fontSize: 12, color: 'var(--tx2)', marginBottom: 10 }}>{rollResult.label}</div>}
-            <div className={'roll-result-anim' + (rollResult.judgment ? (' '+(rollResult.judgment.cls==='roll-fumble'?'roll-fumble-anim':rollResult.judgment.cls==='roll-critical'?'roll-critical-anim':'')) : '')}
-              style={{ fontSize: 72, fontFamily: "'Cinzel', serif", color: resultColor, lineHeight: 1 }}>{rollResult.total}</div>
-            {rollResult.rolls.length > 1 && <div style={{ fontSize: 12, color: 'var(--tx2)', marginTop: 8 }}>[{rollResult.rolls.join(', ')}]</div>}
-            {rollResult.judgment && <div style={{ fontSize: 22, fontFamily: "'Cinzel', serif", color: J_COLORS[rollResult.judgment.cls]||'var(--tx)', marginTop: 14, letterSpacing: '0.1em' }}>{rollResult.judgment.label}</div>}
-          </div>
-        </div>
-      )}
-
-      {history.length > 0 && (
-        <div className="card">
-          <div className="section-title">ロール履歴（直近10件）</div>
-          {history.map((entry, i) => (
-            <div key={entry.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'5px 10px', borderRadius:3, fontSize:12, background:i===0?'var(--bg3)':'transparent', border:'1px solid '+(i===0?'var(--bd)':'transparent') }}>
-              <span style={{ color:'var(--tx3)', width:56, flexShrink:0, fontSize:10 }}>{entry.time}</span>
-              <span style={{ color:'var(--tx2)', width:58, flexShrink:0, fontSize:11 }}>{entry.formula}</span>
-              <span style={{ fontFamily:"'Cinzel', serif", color:'var(--ac)', fontSize:16, width:38, textAlign:'right', flexShrink:0 }}>{entry.total}</span>
-              {entry.judgment && <span style={{ color:J_COLORS[entry.judgment.cls]||'var(--tx2)', fontSize:11 }}>{entry.judgment.label}</span>}
-              {entry.label && !entry.judgment && <span style={{ color:'var(--tx2)', fontSize:11 }}>{entry.label}</span>}
+        {/* 左列: 入力エリア */}
+        <div>
+          <div className="card">
+            <div className="section-title">クイックロール</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--bd2)', borderRadius: 3, padding: '5px 10px' }}>
+                <span style={{ fontSize: 11, color: 'var(--tx2)', fontFamily: "'Cinzel', serif" }}>個数:</span>
+                <input type="number" min="1" max="20" value={diceCount} onChange={e => setDiceCount(Math.max(1,Math.min(20,parseInt(e.target.value)||1)))}
+                  style={{ width: 44, textAlign: 'center', padding: '3px 5px', lineHeight: '1.4' }} />
+              </div>
+              {[4,6,8,10,12,20,100].map(d => (
+                <button key={d} className="btn-primary" onClick={() => doRoll(n+'d'+d, n+'d'+d)}
+                  style={{ fontFamily: "'Cinzel', serif", padding: '7px 13px', fontSize: 13 }}>{n}d{d}</button>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div className="card">
+            <div className="section-title">カスタムロール</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div>
+                <label style={LBL}>ダイス記法</label>
+                <input value={customExpr} onChange={e => setCustomExpr(e.target.value)} onKeyDown={e => e.key==='Enter'&&doRoll(customExpr)} placeholder="3d6+5" style={{ width: 150 }} />
+              </div>
+              <button className="btn-primary" onClick={() => doRoll(customExpr)}>ロール</button>
+            </div>
+            {customErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 8 }}>{customErr}</div>}
+          </div>
+
+          <div className="card">
+            <div className="section-title">技能判定（d100）</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 10 }}>
+              <div>
+                <label style={LBL}>技能値 (%)</label>
+                <input type="number" min="0" max="100" value={skillPct} onChange={e => setSkillPct(e.target.value)} onKeyDown={e => e.key==='Enter'&&doSkillCheck()} placeholder="例: 65" style={{ width: 100 }} />
+              </div>
+              <button className="btn-primary" onClick={doSkillCheck}>判定</button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--tx3)', lineHeight: 1.9 }}>
+              <span style={{ color: 'var(--ac)' }}>イマジナリー</span>: ≤値÷5　<span style={{ color: 'var(--gr)' }}>困難成功</span>: ≤値÷2　<span style={{ color: 'var(--gr)' }}>通常成功</span>: ≤値　<span style={{ color: 'var(--re2)' }}>ファンブル</span>: 96〜100(値&lt;50)/100(値≥50)
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* 右列: 結果 + 履歴（sticky で常に表示） */}
+        <div style={{ position: 'sticky', top: 100, alignSelf: 'start' }}>
+          <div className="card">
+            <div className="section-title">結果</div>
+            {rollResult ? (
+              <div key={rollResult.id} style={{ textAlign: 'center', padding: '4px 0 8px' }}>
+                {rollResult.label && <div style={{ fontSize: 12, color: 'var(--tx2)', marginBottom: 10 }}>{rollResult.label}</div>}
+                <div className={'roll-result-anim' + (rollResult.judgment ? (' '+(rollResult.judgment.cls==='roll-fumble'?'roll-fumble-anim':rollResult.judgment.cls==='roll-critical'?'roll-critical-anim':'')) : '')}
+                  style={{ fontSize: 72, fontFamily: "'Cinzel', serif", color: resultColor, lineHeight: 1 }}>{rollResult.total}</div>
+                {rollResult.rolls.length > 1 && <div style={{ fontSize: 12, color: 'var(--tx2)', marginTop: 8 }}>[{rollResult.rolls.join(', ')}]</div>}
+                {rollResult.judgment && <div style={{ fontSize: 22, fontFamily: "'Cinzel', serif", color: J_COLORS[rollResult.judgment.cls]||'var(--tx)', marginTop: 14, letterSpacing: '0.1em' }}>{rollResult.judgment.label}</div>}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--tx3)', fontFamily: "'Cinzel', serif", letterSpacing: '0.1em', fontSize: 13 }}>
+                — ダイスを振ってください —
+              </div>
+            )}
+          </div>
+
+          {history.length > 0 && (
+            <div className="card">
+              <div className="section-title">ロール履歴（直近10件）</div>
+              {history.map((entry, i) => (
+                <div key={entry.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'5px 10px', borderRadius:3, fontSize:12, background:i===0?'var(--bg3)':'transparent', border:'1px solid '+(i===0?'var(--bd)':'transparent') }}>
+                  <span style={{ color:'var(--tx3)', width:56, flexShrink:0, fontSize:10 }}>{entry.time}</span>
+                  <span style={{ color:'var(--tx2)', width:58, flexShrink:0, fontSize:11 }}>{entry.formula}</span>
+                  <span style={{ fontFamily:"'Cinzel', serif", color:'var(--ac)', fontSize:16, width:38, textAlign:'right', flexShrink:0 }}>{entry.total}</span>
+                  {entry.judgment && <span style={{ color:J_COLORS[entry.judgment.cls]||'var(--tx2)', fontSize:11 }}>{entry.judgment.label}</span>}
+                  {entry.label && !entry.judgment && <span style={{ color:'var(--tx2)', fontSize:11 }}>{entry.label}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }
