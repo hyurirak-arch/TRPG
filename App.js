@@ -61,6 +61,7 @@ function createCharacter(override) {
   return {
     id: uid(),
     name: '名無しの探索者', furigana: '', age: '', birthday: '',
+    sex: '', height: '', weight: '',
     occupation: '', degree: '', origin: '',
     appearance: '', personality: '', background: '',
     occupationFormula: 'EDU20',
@@ -70,6 +71,8 @@ function createCharacter(override) {
     skills: { ...DEFAULT_SKILLS },
     customSkills: [],
     bonuses: { HP: 0, MP: 0, STR: 0, CON: 0, SIZ: 0, DEX: 0, APP: 0, INT: 0, POW: 0, EDU: 0, skills: [] },
+    typedMemo: '', completedScenarios: '',
+    assets: { income: '', cashInHand: '', bankDeposit: '', personalAssets: '', realEstate: '' },
     weapons: [], equipment: [], imageData: null, sketchData: null,
     ...(override || {}),
   };
@@ -464,7 +467,29 @@ function LabeledTextarea({ label, value, onChange, placeholder, rows }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <label style={LBL}>{label}</label>
-      <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows || 3} style={{ width: '100%', resize: 'vertical', lineHeight: 1.6 }} />
+      <div style={{ position: 'relative' }}>
+        <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows || 3}
+          style={{ width: '100%', resize: 'vertical', lineHeight: 1.6, paddingBottom: 16 }} />
+        <span style={{ position: 'absolute', bottom: 5, right: 7, fontSize: 11, color: 'var(--tx3)', pointerEvents: 'none', lineHeight: 1, userSelect: 'none' }} title="ドラッグで拡大">⇲</span>
+      </div>
+    </div>
+  );
+}
+
+function CollapsibleCard({ title, titleSub, right, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: open ? 14 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flex: right ? 'none' : 1 }}
+             onClick={() => setOpen(o => !o)}>
+          <span className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>{title}</span>
+          {titleSub && <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>{titleSub}</span>}
+          <span style={{ color: 'var(--tx3)', fontSize: 10 }}>{open ? '▲' : '▼'}</span>
+        </div>
+        {right}
+      </div>
+      {open && children}
     </div>
   );
 }
@@ -810,8 +835,9 @@ function CharDetailModal({ member, onClose }) {
 // ============================================================
 
 function CharacterSheet({ character, onChange }) {
-  const [randomFlash, setRandomFlash] = useState(null);
-  const [showPreset,  setShowPreset]  = useState(false);
+  const [randomFlash,    setRandomFlash]    = useState(null);
+  const [showPreset,     setShowPreset]     = useState(false);
+  const [hideBaseSkills, setHideBaseSkills] = useState(false);
   const fileRef = useRef(null);
 
   const set = (field, val) => onChange(prev => ({ ...prev, [field]: val }));
@@ -855,7 +881,10 @@ function CharacterSheet({ character, onChange }) {
     const base = skill.base === 'DEX×2' ? abilities.DEX * 2 : (typeof skill.base === 'number' ? skill.base : 0);
     const cur = skills[skill.key] !== undefined ? skills[skill.key] : base;
     return total + Math.max(0, cur - base);
-  }, 0) + (character.customSkills||[]).reduce((total, sk) => total + (sk.value||0), 0);
+  }, 0) + (character.customSkills||[]).reduce((total, sk) => {
+    const skAdded = sk.added !== undefined ? (sk.added||0) : 0;
+    return total + skAdded;
+  }, 0);
   const remainingPoints = occTotal + intTotal - usedSkillPoints;
 
   const addWeapon = () => onChange(prev => ({ ...prev, weapons: [...(prev.weapons||[]), { id: uid(), name:'', skill:'', damage:'', attacks:'1', ammo:'', malfunction:'', memo:'' }] }));
@@ -864,7 +893,7 @@ function CharacterSheet({ character, onChange }) {
   const addEquip  = () => onChange(prev => ({ ...prev, equipment: [...(prev.equipment||[]), { id: uid(), name:'', qty:'1', memo:'' }] }));
   const upEquip   = (id, f, v) => onChange(prev => ({ ...prev, equipment: (prev.equipment||[]).map(e => e.id===id ? {...e,[f]:v} : e) }));
   const delEquip  = (id) => onChange(prev => ({ ...prev, equipment: (prev.equipment||[]).filter(e => e.id!==id) }));
-  const addCustomSkill = () => onChange(prev => ({ ...prev, customSkills: [...(prev.customSkills||[]), { id: uid(), label:'', value: 0 }] }));
+  const addCustomSkill = () => onChange(prev => ({ ...prev, customSkills: [...(prev.customSkills||[]), { id: uid(), label:'', base: 0, added: 0 }] }));
   const upCustomSkill  = (id, f, v) => onChange(prev => ({ ...prev, customSkills: (prev.customSkills||[]).map(s => s.id===id ? {...s,[f]:v} : s) }));
   const delCustomSkill = (id) => onChange(prev => ({ ...prev, customSkills: (prev.customSkills||[]).filter(s => s.id!==id) }));
 
@@ -911,11 +940,13 @@ function CharacterSheet({ character, onChange }) {
       </div>
 
       {/* Basic Info */}
-      <div className="card">
-        <div className="section-title">基本情報</div>
+      <CollapsibleCard title="基本情報">
         <div className="info-grid">
           <LabeledInput label="年齢" value={character.age||''} onChange={e => set('age', e.target.value)} type="number" placeholder="歳" />
           <LabeledInput label="誕生日" value={character.birthday||''} onChange={e => set('birthday', e.target.value)} placeholder="例: 1920/04/15" />
+          <LabeledInput label="性別" value={character.sex||''} onChange={e => set('sex', e.target.value)} placeholder="男・女・その他..." />
+          <LabeledInput label="身長" value={character.height||''} onChange={e => set('height', e.target.value)} placeholder="cm" />
+          <LabeledInput label="体重" value={character.weight||''} onChange={e => set('weight', e.target.value)} placeholder="kg" />
           <LabeledInput label="職業" value={character.occupation||''} onChange={e => set('occupation', e.target.value)} placeholder="探偵、医師..." />
           <LabeledInput label="学位" value={character.degree||''} onChange={e => set('degree', e.target.value)} placeholder="博士、修士..." />
           <LabeledInput label="出身地" value={character.origin||''} onChange={e => set('origin', e.target.value)} placeholder="都市・国名..." />
@@ -926,24 +957,20 @@ function CharacterSheet({ character, onChange }) {
             </select>
           </div>
         </div>
-      </div>
+      </CollapsibleCard>
 
       {/* Background */}
-      <div className="card">
-        <div className="section-title">外見・性格・背景</div>
+      <CollapsibleCard title="外見・性格・背景">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0 14px' }}>
           <LabeledTextarea label="外見" value={character.appearance||''} onChange={e => set('appearance', e.target.value)} placeholder="容姿、服装、特徴..." rows={3} />
           <LabeledTextarea label="性格・信条" value={character.personality||''} onChange={e => set('personality', e.target.value)} placeholder="性格、信念、行動原理..." rows={3} />
           <LabeledTextarea label="背景・経歴" value={character.background||''} onChange={e => set('background', e.target.value)} placeholder="生い立ち、重要な出来事..." rows={3} />
         </div>
-      </div>
+      </CollapsibleCard>
 
       {/* Abilities */}
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>能力値<span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', marginLeft: 8 }}>（右列 = ×5 基本技能値）</span></div>
-          <button className="btn-green" onClick={handleRandom} style={{ fontSize: 12 }}>🎲 ランダム決定</button>
-        </div>
+      <CollapsibleCard title="能力値" titleSub="（右列 = ×5 基本技能値）"
+        right={<button className="btn-green" onClick={handleRandom} style={{ fontSize: 12 }}>🎲 ランダム決定</button>}>
         <div className="abilities-grid">
           {Object.keys(ABILITY_ROLL).map(ab => (
             <AbilityRow key={ab} label={ab} value={abilities[ab]} flash={!!randomFlash} onChange={e => setAbility(ab, e.target.value)} />
@@ -952,11 +979,10 @@ function CharacterSheet({ character, onChange }) {
         <div style={{ marginTop: 10, fontSize: 11, color: 'var(--tx3)', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           {Object.entries(ABILITY_ROLL).map(([ab, f]) => <span key={ab}><span style={{ color: 'var(--tx3)' }}>{ab}:</span> {f}</span>)}
         </div>
-      </div>
+      </CollapsibleCard>
 
       {/* Derived */}
-      <div className="card">
-        <div className="section-title">副次能力値</div>
+      <CollapsibleCard title="副次能力値">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
           <StatTracker label="HP 耐久力" current={currentHP} max={maxHP} color="var(--gr)"
             onDecrement={() => set('currentHP', clamp(currentHP-1,0,maxHP))} onIncrement={() => set('currentHP', clamp(currentHP+1,0,maxHP))} />
@@ -978,16 +1004,18 @@ function CharacterSheet({ character, onChange }) {
             </label>
           ))}
         </div>
-      </div>
+      </CollapsibleCard>
 
       {/* Skills */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>
-            技能リスト <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>基本値 → 現在値</span>
+      <CollapsibleCard title="技能リスト" titleSub="合計 基本値+ 加算"
+        right={
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn-ghost" onClick={() => setHideBaseSkills(h => !h)} style={{ fontSize: 12, padding: '5px 10px' }}>
+              {hideBaseSkills ? '👁 全表示' : '🙈 未振り非表示'}
+            </button>
+            <button className="btn-primary" onClick={addCustomSkill} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 技能追加</button>
           </div>
-          <button className="btn-primary" onClick={addCustomSkill} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 技能追加</button>
-        </div>
+        }>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, marginBottom: 14, padding: '6px 10px', background: 'var(--bg3)', borderRadius: 3, border: '1px solid var(--bd)', alignItems: 'center' }}>
           <span style={{ color: 'var(--tx3)' }}>職業P: <span style={{ color: 'var(--gr)', fontFamily: "'Cinzel', serif" }}>{occTotal}</span></span>
           <span style={{ color: 'var(--tx3)' }}>趣味P: <span style={{ color: 'var(--bl)', fontFamily: "'Cinzel', serif" }}>{intTotal}</span></span>
@@ -1000,6 +1028,7 @@ function CharacterSheet({ character, onChange }) {
             const numBase = typeof base === 'number' ? base : 0;
             const cur     = skills[skill.key] !== undefined ? skills[skill.key] : numBase;
             const added   = Math.max(0, cur - numBase);
+            if (hideBaseSkills && added === 0) return null;
             return (
               <div key={skill.key} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
                 <span style={{ flex: 1, fontSize: 13, color: 'var(--tx)' }}>{skill.label}</span>
@@ -1015,30 +1044,41 @@ function CharacterSheet({ character, onChange }) {
         {(character.customSkills||[]).length > 0 && (
           <div style={{ borderTop: '1px solid var(--bd)', marginTop: 10, paddingTop: 10 }}>
             <div className="skills-grid">
-              {(character.customSkills||[]).map(sk => (
-                <div key={sk.id} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
-                  <input value={sk.label} onChange={e => upCustomSkill(sk.id,'label',e.target.value)}
-                    placeholder="技能名…" style={{ flex: 1, fontSize: 12, background: 'transparent', border: 'none', outline: 'none', color: 'var(--tx)', padding: 0 }} />
-                  <input type="number" min="0" max="99" value={sk.value} onChange={e => upCustomSkill(sk.id,'value',Math.max(0,parseInt(e.target.value)||0))}
-                    style={{ width: 44, textAlign: 'center', padding: '3px 4px', fontSize: 13, lineHeight: '1.4' }} />
-                  <button onClick={() => delCustomSkill(sk.id)}
-                    style={{ background: 'transparent', color: 'var(--tx3)', border: 'none', fontSize: 12, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
-                </div>
-              ))}
+              {(character.customSkills||[]).map(sk => {
+                const skBase  = sk.base  !== undefined ? (sk.base||0)  : (sk.value||0);
+                const skAdded = sk.added !== undefined ? (sk.added||0) : 0;
+                const skTotal = skBase + skAdded;
+                if (hideBaseSkills && skAdded === 0) return null;
+                return (
+                  <div key={sk.id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
+                    <input value={sk.label} onChange={e => upCustomSkill(sk.id,'label',e.target.value)}
+                      placeholder="技能名…" style={{ flex: 1, fontSize: 12, background: 'transparent', border: 'none', outline: 'none', color: 'var(--tx)', padding: 0 }} />
+                    <span style={{ fontSize: 15, color: 'var(--ac)', fontFamily: "'Cinzel', serif", width: 28, textAlign: 'right', flexShrink: 0 }}>{skTotal}</span>
+                    <input type="number" min="0" max="99" value={skBase}
+                      onChange={e => upCustomSkill(sk.id,'base',Math.max(0,parseInt(e.target.value)||0))}
+                      title="初期値" style={{ width: 36, textAlign: 'center', padding: '3px 4px', fontSize: 12, lineHeight: '1.4' }} />
+                    <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0 }}>+</span>
+                    <input type="number" min="0" max="99" value={skAdded}
+                      onChange={e => upCustomSkill(sk.id,'added',Math.max(0,parseInt(e.target.value)||0))}
+                      title="加算ポイント" style={{ width: 36, textAlign: 'center', padding: '3px 4px', fontSize: 12, lineHeight: '1.4' }} />
+                    <button onClick={() => delCustomSkill(sk.id)}
+                      style={{ background: 'transparent', color: 'var(--tx3)', border: 'none', fontSize: 12, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
-      </div>
+      </CollapsibleCard>
 
       {/* Weapons */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>武器・攻撃</div>
+      <CollapsibleCard title="武器・攻撃"
+        right={
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn-ghost" onClick={() => setShowPreset(s => !s)} style={{ fontSize: 12 }}>📋 プリセット</button>
             <button className="btn-primary" onClick={addWeapon} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
           </div>
-        </div>
+        }>
         {showPreset && (
           <div className="slide-in" style={{ background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 4, padding: '12px 14px', marginBottom: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--tx2)', marginBottom: 10, fontFamily: "'Cinzel', serif", letterSpacing: '0.08em' }}>追加する武器を選択</div>
@@ -1073,14 +1113,11 @@ function CharacterSheet({ character, onChange }) {
             <button className="btn-danger" onClick={() => delWeapon(w.id)}>✕</button>
           </div>
         ))}
-      </div>
+      </CollapsibleCard>
 
       {/* Equipment */}
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>所持品・装備</div>
-          <button className="btn-primary" onClick={addEquip} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
-        </div>
+      <CollapsibleCard title="所持品・装備"
+        right={<button className="btn-primary" onClick={addEquip} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>}>
         {equipment.length === 0 && <div style={{ color: 'var(--tx3)', fontSize: 12, textAlign: 'center', padding: '10px 0' }}>所持品が登録されていません</div>}
         {equipment.map(e => (
           <div key={e.id} className="equip-row">
@@ -1091,11 +1128,10 @@ function CharacterSheet({ character, onChange }) {
             <button className="btn-danger" onClick={() => delEquip(e.id)}>✕</button>
           </div>
         ))}
-      </div>
+      </CollapsibleCard>
 
       {/* Temporary Bonuses */}
-      <div className="card">
-        <div className="section-title">一時的ボーナス</div>
+      <CollapsibleCard title="一時的ボーナス">
         <div style={{ fontSize: 11, color: 'var(--tx3)', marginBottom: 12 }}>アイテム・呪文などによる一時的な増加分を記録します</div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -1147,14 +1183,39 @@ function CharacterSheet({ character, onChange }) {
             ))}
           </div>
         </div>
-      </div>
+      </CollapsibleCard>
+
+      {/* Typed Memo */}
+      <CollapsibleCard title="テキストメモ">
+        <LabeledTextarea label="メモ" value={character.typedMemo||''} onChange={e => set('typedMemo', e.target.value)}
+          placeholder="自由にメモを書けます..." rows={5} />
+      </CollapsibleCard>
+
+      {/* Completed Scenarios */}
+      <CollapsibleCard title="通過したシナリオ">
+        <LabeledTextarea label="シナリオ名" value={character.completedScenarios||''} onChange={e => set('completedScenarios', e.target.value)}
+          placeholder="クリアしたシナリオを記録..." rows={4} />
+      </CollapsibleCard>
+
+      {/* Assets */}
+      <CollapsibleCard title="収入と財産">
+        <div className="info-grid">
+          {[['収入', 'income', '月収・給与...'], ['手持ち現金', 'cashInHand', '現在所持中...'], ['預金', 'bankDeposit', '銀行口座残高...'], ['個人資産', 'personalAssets', '動産など...'], ['不動産', 'realEstate', '土地・建物...']].map(([lbl, fld, ph]) => (
+            <div key={fld} style={{ marginBottom: 10 }}>
+              <label style={LBL}>{lbl}</label>
+              <input value={(character.assets||{})[fld]||''}
+                onChange={e => onChange(prev => ({ ...prev, assets: { ...(prev.assets||{}), [fld]: e.target.value } }))}
+                placeholder={ph} style={{ width: '100%' }} />
+            </div>
+          ))}
+        </div>
+      </CollapsibleCard>
 
       {/* Sketch Memo */}
-      <div className="card">
-        <div className="section-title">手書きメモ</div>
+      <CollapsibleCard title="手書きメモ">
         <SketchCanvas key={character.id} data={character.sketchData}
           onChange={v => set('sketchData', v)} />
-      </div>
+      </CollapsibleCard>
     </div>
   );
 }
