@@ -310,143 +310,6 @@ function charToMember(char) {
 // GLOBAL CSS
 // ============================================================
 
-const GLOBAL_CSS = `
-  /* ===== CSS VARIABLES ===== */
-  :root {
-    --bg:#0a0a0f; --bg2:#111118; --bg3:#0d0d14;
-    --tx:#d4c9a8; --tx2:#c8b888; --tx3:#8a7a60;
-    --ac:#c9a84c; --pac:#4a3e20;
-    --re:#8b1a1a; --re2:#c42828; --re-b:#3a0a0a; --re-bg:#160808;
-    --gr:#3d9a68; --gr-b:#1a3a1a; --gr-bg:#081408;
-    --bl:#4a7aaa; --bl-b:#1a2a4a; --bl-bg:#0a0e1a;
-    --bd:#302848; --bd2:#3e3458; --scr:#2d4a3e;
-    --pb:#181810; --head:#070710;
-  }
-  :root[data-theme="light"] {
-    --bg:#f5f0e4; --bg2:#ece6d4; --bg3:#e6e0ce;
-    --tx:#231a08; --tx2:#6a5840; --tx3:#9a8a68;
-    --ac:#8b6010; --pac:#c8a840;
-    --re:#8b1a1a; --re2:#b02020; --re-b:#d09080; --re-bg:#f5e8e8;
-    --gr:#2a7a50; --gr-b:#90c0a0; --gr-bg:#e8f5ee;
-    --bl:#2a5a8a; --bl-b:#90aad0; --bl-bg:#e8eef8;
-    --bd:#c8b890; --bd2:#b8a878; --scr:#a89870;
-    --pb:#e8e0c8; --head:#ede5d0;
-  }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background-color: var(--bg); color: var(--tx); font-family: 'Special Elite', cursive; min-height: 100vh; overflow-x: hidden; }
-  body::after {
-    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9998;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-    opacity: 0.3; mix-blend-mode: overlay;
-  }
-  [data-theme="light"] body::after { opacity: 0.12; mix-blend-mode: multiply; }
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--scr); border-radius: 3px; }
-
-  input, textarea, select {
-    font-family: 'Special Elite', cursive; background: var(--bg3); color: var(--tx);
-    border: 1px solid var(--bd2); border-radius: 3px; padding: 6px 10px;
-    outline: none; font-size: 13px; line-height: 1.4; transition: border-color 0.2s; vertical-align: middle;
-  }
-  input:focus, textarea:focus, select:focus { border-color: var(--ac); }
-  input[type=number] { -moz-appearance: textfield; }
-  input[type=number]::-webkit-inner-spin-button,
-  input[type=number]::-webkit-outer-spin-button { opacity: 0.3; }
-  select { cursor: pointer; } select option { background: var(--bg2); }
-
-  button { font-family: 'Special Elite', cursive; cursor: pointer; border: none; border-radius: 3px; transition: all 0.15s; font-size: 13px; line-height: 1.4; vertical-align: middle; }
-
-  .tab-btn { background: transparent; color: var(--tx2); border: 1px solid var(--bd2); padding: 8px 16px; font-size: 12px; letter-spacing: 0.06em; font-family: 'Cinzel', serif; border-radius: 3px 3px 0 0; border-bottom: none; white-space: nowrap; }
-  .tab-btn:hover { color: var(--ac); border-color: var(--pac); background: var(--bg3); }
-  .tab-btn.active { color: var(--ac); background: var(--bg2); border-color: var(--pac); border-bottom: 2px solid var(--ac); }
-
-  .btn-primary { background: var(--pb); color: var(--ac); border: 1px solid var(--pac); padding: 7px 16px; }
-  .btn-primary:hover { background: var(--bg2); border-color: var(--ac); transform: translateY(-1px); }
-  .btn-primary:active { transform: scale(0.97); }
-
-  .btn-danger { background: var(--re-bg); color: var(--re); border: 1px solid var(--re-b); padding: 5px 10px; font-size: 12px; }
-  .btn-danger:hover { color: var(--re2); border-color: var(--re); }
-
-  .btn-ghost { background: transparent; color: var(--tx2); border: 1px solid var(--bd2); padding: 5px 10px; font-size: 12px; }
-  .btn-ghost:hover { color: var(--tx); border-color: var(--tx3); }
-
-  .btn-green { background: var(--gr-bg); color: var(--gr); border: 1px solid var(--gr-b); padding: 7px 14px; font-size: 12px; }
-  .btn-green:hover { border-color: var(--gr); }
-
-  .btn-share { background: var(--bl-bg); color: var(--bl); border: 1px solid var(--bl-b); padding: 5px 12px; font-size: 12px; }
-  .btn-share:hover { border-color: var(--bl); }
-
-  .btn-theme { background: var(--bg3); color: var(--tx2); border: 1px solid var(--bd2); padding: 5px 12px; font-size: 12px; border-radius: 3px; }
-  .btn-theme:hover { color: var(--ac); border-color: var(--pac); }
-
-  .section-title { font-family: 'Cinzel', serif; color: var(--ac); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; border-bottom: 1px solid var(--bd); padding-bottom: 8px; margin-bottom: 14px; }
-  .card { background: var(--bg2); border: 1px solid var(--bd); border-radius: 4px; padding: 16px; margin-bottom: 14px; }
-
-  .tab-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid var(--bd); }
-
-  .abilities-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 8px; }
-  .skills-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 5px; }
-  .creature-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-  .info-grid      { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0 14px; }
-  .session-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
-  .member-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
-  .dice-grid      { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-
-  .creature-card { background: var(--bg2); border: 1px solid var(--bd); border-radius: 4px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
-  .creature-card:hover { border-color: var(--pac); box-shadow: 0 0 14px rgba(201,168,76,0.07); }
-
-  .char-tab { background: var(--bg3); color: var(--tx2); border: 1px solid var(--bd2); padding: 5px 12px; font-size: 12px; border-radius: 3px; white-space: nowrap; }
-  .char-tab:hover { color: var(--ac); border-color: var(--pac); }
-  .char-tab.active { color: var(--ac); background: var(--pb); border-color: var(--pac); }
-
-  .group-tab { background: var(--bl-bg); color: var(--bl); border: 1px solid var(--bl-b); padding: 5px 12px; font-size: 12px; border-radius: 3px; white-space: nowrap; }
-  .group-tab:hover { border-color: var(--bl); }
-  .group-tab.active { background: var(--bl-bg); border-color: var(--bl); font-weight: bold; }
-
-  .weapon-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 3px; margin-bottom: 6px; }
-  .equip-row  { display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 3px; margin-bottom: 5px; }
-  .custom-skill-row { display: flex; gap: 6px; align-items: center; padding: 5px 8px; background: var(--bg3); border: 1px solid var(--bd); border-radius: 3px; margin-bottom: 5px; }
-
-  .share-box { background: var(--bl-bg); border: 1px solid var(--bl-b); border-radius: 4px; padding: 14px; margin-top: 10px; }
-  .import-box { background: var(--gr-bg); border: 1px solid var(--gr-b); border-radius: 4px; padding: 14px; margin-top: 10px; }
-
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 9999; overflow: auto; padding: 20px; display: flex; align-items: flex-start; justify-content: center; }
-  .modal-inner { background: var(--bg2); border: 1px solid var(--pac); border-radius: 6px; padding: 24px; width: 100%; max-width: 780px; margin: auto; }
-
-  .sketch-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; padding: 8px; background: var(--bg3); border-radius: 3px; border: 1px solid var(--bd); }
-
-  @keyframes eldritch-reveal { 0% { opacity:0;transform:scale(1.6) rotate(-4deg);letter-spacing:0.5em;filter:blur(6px); } 50% { opacity:0.7;filter:blur(1px); } 75% { transform:scale(1.04) rotate(0.5deg);filter:blur(0); } 100% { opacity:1;transform:scale(1) rotate(0);letter-spacing:normal;filter:blur(0); } }
-  @keyframes flicker { 0%,18%,20%,24%,54%,56%,100% { opacity:1; } 19%,22%,55% { opacity:0.15; } }
-  @keyframes turn-pulse { 0%,100% { box-shadow:0 0 0 0 rgba(201,168,76,0.5); } 50% { box-shadow:0 0 0 8px rgba(201,168,76,0); } }
-  @keyframes madness-in { 0% { opacity:0;transform:translateY(-8px) scale(0.97); } 100% { opacity:1;transform:translateY(0) scale(1); } }
-  @keyframes header-glow { 0%,100% { text-shadow:0 0 18px rgba(201,168,76,0.25); } 50% { text-shadow:0 0 30px rgba(201,168,76,0.45), 0 0 60px rgba(201,168,76,0.1); } }
-  @keyframes random-flash { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-  @keyframes slide-in { from { opacity:0;transform:translateY(-6px); } to { opacity:1;transform:translateY(0); } }
-
-  .roll-result-anim { animation: eldritch-reveal 0.75s ease-out forwards; }
-  .roll-fumble-anim { animation: flicker 0.35s ease-in-out 3; }
-  .roll-critical-anim { animation: flicker 0.28s ease-in-out 4; }
-  .madness-anim { animation: madness-in 0.35s ease-out; }
-  .current-turn-row { animation: turn-pulse 1.5s ease-in-out infinite; }
-  .app-title { animation: header-glow 4s ease-in-out infinite; }
-  .random-flash { animation: random-flash 0.15s ease-in-out 4; }
-  .slide-in { animation: slide-in 0.2s ease-out; }
-
-  @media (max-width: 640px) {
-    .abilities-grid { grid-template-columns: 1fr 1fr; }
-    .skills-grid    { grid-template-columns: 1fr; }
-    .creature-grid  { grid-template-columns: 1fr; }
-    .info-grid      { grid-template-columns: 1fr 1fr; }
-    .session-grid   { grid-template-columns: 1fr; }
-    .member-grid    { grid-template-columns: 1fr; }
-    .dice-grid      { grid-template-columns: 1fr; }
-    .tab-btn        { padding: 6px 10px; font-size: 11px; }
-    .card           { padding: 12px; }
-  }
-  @media (max-width: 380px) { .abilities-grid { grid-template-columns: 1fr; } .info-grid { grid-template-columns: 1fr; } }
-`;
 
 // ============================================================
 // LEAF COMPONENTS
@@ -480,14 +343,17 @@ function CollapsibleCard({ title, titleSub, right, children, defaultOpen = true 
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: open ? 14 : 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flex: right ? 'none' : 1 }}
-             onClick={() => setOpen(o => !o)}>
-          <span className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>{title}</span>
-          {titleSub && <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>{titleSub}</span>}
-          <span style={{ color: 'var(--tx3)', fontSize: 10 }}>{open ? '▲' : '▼'}</span>
-        </div>
-        {right}
+      <div onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                 borderBottom: open ? '1px solid var(--bd)' : 'none',
+                 paddingBottom: open ? 8 : 0, marginBottom: open ? 10 : 0 }}>
+        <span className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>{title}</span>
+        {titleSub && <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>{titleSub}</span>}
+        <div style={{ flex: 1 }} />
+        {right && <div onClick={e => e.stopPropagation()}>{right}</div>}
+        <span style={{ color: 'var(--tx3)', fontSize: 12, flexShrink: 0, paddingLeft: 6, lineHeight: 1 }}>
+          {open ? '▼' : '▶'}
+        </span>
       </div>
       {open && children}
     </div>
@@ -533,7 +399,7 @@ function CopyButton({ text, label }) {
   const handle = () => copyText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   return (
     <button className="btn-share" onClick={handle} style={{ minWidth: 80 }}>
-      {copied ? '✓ コピー済' : (label || '📋 コピー')}
+      {copied ? '✓ コピー済' : (label || <><i className="fa-regular fa-copy"></i> コピー</>)}
     </button>
   );
 }
@@ -692,8 +558,8 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
           <button className="btn-primary" onClick={onAdd} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 新規</button>
           <button className="btn-ghost" onClick={onDuplicate} style={{ fontSize: 12 }}>複製</button>
           {characters.length > 1 && <button className="btn-danger" onClick={() => onDelete(activeId)} style={{ fontSize: 12 }}>削除</button>}
-          <button className="btn-share" onClick={() => setPanel(panel === 'share' ? null : 'share')} style={{ fontSize: 12 }}>📤 共有</button>
-          <button className="btn-green" onClick={() => setPanel(panel === 'import' ? null : 'import')} style={{ fontSize: 12 }}>📥 インポート</button>
+          <button className="btn-share" onClick={() => setPanel(panel === 'share' ? null : 'share')} style={{ fontSize: 12 }}><i class="fa-solid fa-right-from-bracket" style={{marginRight:5}}></i>共有</button>
+          <button className="btn-green" onClick={() => setPanel(panel === 'import' ? null : 'import')} style={{ fontSize: 12 }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>インポート</button>
         </div>
       </div>
 
@@ -708,13 +574,13 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
       {panel === 'share' && active && (
         <div className="share-box slide-in">
           <div style={{ fontSize: 11, color: 'var(--bl)', marginBottom: 8, fontFamily: "'Cinzel', serif", letterSpacing: '0.06em' }}>
-            📤 このテキストをLINEなどで送ってください（画像は除外）
+            <i class="fa-solid fa-right-from-bracket" style={{marginRight:5}}></i>このテキストをLINEなどで送ってください（画像は除外）
           </div>
           <textarea readOnly value={shareText} rows={5}
             style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', background: 'var(--bg)', color: 'var(--bl)', border: '1px solid var(--bl-b)', resize: 'none' }}
             onClick={e => e.target.select()} />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <CopyButton text={shareText} label="📋 コピー" />
+            <CopyButton text={shareText} label={<><i className="fa-regular fa-copy"></i> コピー</>} />
             <button className="btn-ghost" onClick={() => setPanel(null)} style={{ fontSize: 12 }}>閉じる</button>
           </div>
         </div>
@@ -723,7 +589,7 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
       {panel === 'import' && (
         <div className="import-box slide-in">
           <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif", letterSpacing: '0.06em' }}>
-            📥 共有テキストを貼り付けてインポート
+            <i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>共有テキストを貼り付けてインポート
           </div>
           <textarea value={importText} onChange={e => { setImportText(e.target.value); setImportErr(''); }}
             placeholder="━━━ CoC6 探索者... のテキストを貼り付け ━━━" rows={5}
@@ -1011,7 +877,7 @@ function CharacterSheet({ character, onChange }) {
         right={
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn-ghost" onClick={() => setHideBaseSkills(h => !h)} style={{ fontSize: 12, padding: '5px 10px' }}>
-              {hideBaseSkills ? '👁 全表示' : '🙈 未振り非表示'}
+              {hideBaseSkills ? '全表示' : '未振り非表示'}
             </button>
             <button className="btn-primary" onClick={addCustomSkill} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 技能追加</button>
           </div>
@@ -1050,9 +916,9 @@ function CharacterSheet({ character, onChange }) {
                 const skTotal = skBase + skAdded;
                 if (hideBaseSkills && skAdded === 0) return null;
                 return (
-                  <div key={sk.id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
+                  <div key={sk.id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' ,minWidth: 0}}>
                     <input value={sk.label} onChange={e => upCustomSkill(sk.id,'label',e.target.value)}
-                      placeholder="技能名…" style={{ flex: 1, fontSize: 12, background: 'transparent', border: 'none', outline: 'none', color: 'var(--tx)', padding: 0 }} />
+                      placeholder="技能名…" style={{ flex: 1, minWidth: 0, fontSize: 12, background: 'transparent', border: 'none', outline: 'none', color: 'var(--tx)', padding: 0 }} />
                     <span style={{ fontSize: 15, color: 'var(--ac)', fontFamily: "'Cinzel', serif", width: 28, textAlign: 'right', flexShrink: 0 }}>{skTotal}</span>
                     <input type="number" min="0" max="99" value={skBase}
                       onChange={e => upCustomSkill(sk.id,'base',Math.max(0,parseInt(e.target.value)||0))}
@@ -1130,6 +996,20 @@ function CharacterSheet({ character, onChange }) {
         ))}
       </CollapsibleCard>
 
+      {/* Assets */}
+      <CollapsibleCard title="収入と財産">
+        <div className="info-grid">
+          {[['収入', 'income', '月収・給与...'], ['手持ち現金', 'cashInHand', '現在所持中...'], ['預金', 'bankDeposit', '銀行口座残高...'], ['個人資産', 'personalAssets', '動産など...'], ['不動産', 'realEstate', '土地・建物...']].map(([lbl, fld, ph]) => (
+            <div key={fld} style={{ marginBottom: 10 }}>
+              <label style={LBL}>{lbl}</label>
+              <input value={(character.assets||{})[fld]||''}
+                onChange={e => onChange(prev => ({ ...prev, assets: { ...(prev.assets||{}), [fld]: e.target.value } }))}
+                placeholder={ph} style={{ width: '100%' }} />
+            </div>
+          ))}
+        </div>
+      </CollapsibleCard>
+
       {/* Temporary Bonuses */}
       <CollapsibleCard title="一時的ボーナス">
         <div style={{ fontSize: 11, color: 'var(--tx3)', marginBottom: 12 }}>アイテム・呪文などによる一時的な増加分を記録します</div>
@@ -1185,30 +1065,16 @@ function CharacterSheet({ character, onChange }) {
         </div>
       </CollapsibleCard>
 
-      {/* Typed Memo */}
-      <CollapsibleCard title="テキストメモ">
-        <LabeledTextarea label="メモ" value={character.typedMemo||''} onChange={e => set('typedMemo', e.target.value)}
-          placeholder="自由にメモを書けます..." rows={5} />
-      </CollapsibleCard>
-
       {/* Completed Scenarios */}
       <CollapsibleCard title="通過したシナリオ">
         <LabeledTextarea label="シナリオ名" value={character.completedScenarios||''} onChange={e => set('completedScenarios', e.target.value)}
           placeholder="クリアしたシナリオを記録..." rows={4} />
       </CollapsibleCard>
 
-      {/* Assets */}
-      <CollapsibleCard title="収入と財産">
-        <div className="info-grid">
-          {[['収入', 'income', '月収・給与...'], ['手持ち現金', 'cashInHand', '現在所持中...'], ['預金', 'bankDeposit', '銀行口座残高...'], ['個人資産', 'personalAssets', '動産など...'], ['不動産', 'realEstate', '土地・建物...']].map(([lbl, fld, ph]) => (
-            <div key={fld} style={{ marginBottom: 10 }}>
-              <label style={LBL}>{lbl}</label>
-              <input value={(character.assets||{})[fld]||''}
-                onChange={e => onChange(prev => ({ ...prev, assets: { ...(prev.assets||{}), [fld]: e.target.value } }))}
-                placeholder={ph} style={{ width: '100%' }} />
-            </div>
-          ))}
-        </div>
+      {/* Typed Memo */}
+      <CollapsibleCard title="テキストメモ">
+        <LabeledTextarea label="メモ" value={character.typedMemo||''} onChange={e => set('typedMemo', e.target.value)}
+          placeholder="自由にメモを書けます..." rows={5} />
       </CollapsibleCard>
 
       {/* Sketch Memo */}
@@ -1515,13 +1381,13 @@ function GroupManager({ groups, setGroups, localCharacters }) {
           <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap' }}>
             <button className="btn-primary" onClick={addGroup} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 新規</button>
             {activeGroup && groups.length > 1 && <button className="btn-danger" onClick={() => delGroup(activeGroup.id)} style={{ fontSize: 12 }}>削除</button>}
-            <button className="btn-share" onClick={() => setShowGroupImport(s => !s)} style={{ fontSize: 12 }}>📥 インポート</button>
+            <button className="btn-share" onClick={() => setShowGroupImport(s => !s)} style={{ fontSize: 12 }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>インポート</button>
           </div>
         </div>
 
         {showGroupImport && (
           <div className="import-box slide-in">
-            <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}>📥 グループ共有テキストを貼り付け</div>
+            <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>グループ共有テキストを貼り付け</div>
             <textarea value={groupImportText} onChange={e => { setGroupImportText(e.target.value); setGroupImportErr(''); }}
               placeholder="━━━ CoC6 グループ... のテキストを貼り付け ━━━" rows={4} style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none' }} />
             {groupImportErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 4 }}>{groupImportErr}</div>}
@@ -1563,7 +1429,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
                   ＋ ローカルから追加
                 </button>
                 <button className="btn-share" onClick={() => { setShowImportMember(s=>!s); setShowAddLocal(false); }} style={{ fontSize: 12 }}>
-                  📥 テキストから追加
+                  <i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>テキストから追加
                 </button>
               </div>
             </div>
@@ -1584,7 +1450,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
 
             {showImportMember && (
               <div className="import-box slide-in" style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: 'var(--bl)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}>📥 プレイヤーから受け取った探索者テキストを貼り付け:</div>
+                <div style={{ fontSize: 11, color: 'var(--bl)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>プレイヤーから受け取った探索者テキストを貼り付け:</div>
                 <textarea value={memberImportText} onChange={e => { setMemberImportText(e.target.value); setMemberImportErr(''); }}
                   placeholder="━━━ CoC6 探索者: ... のテキストを貼り付け ━━━" rows={4} style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none' }} />
                 {memberImportErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 4 }}>{memberImportErr}</div>}
@@ -1642,10 +1508,10 @@ function GroupManager({ groups, setGroups, localCharacters }) {
             <div className="section-title">グループ共有</div>
             <div style={{ fontSize: 12, color: 'var(--tx2)', marginBottom: 12, lineHeight: 1.7 }}>
               グループ全体（メンバーのキャラデータ・ストーリー・ログ含む）をテキストにエクスポートします。<br/>
-              受け取った側は「📥 インポート」に貼り付けることでグループを復元できます。
+              受け取った側は「<i class="fa-solid fa-right-to-bracket" style={{marginRight:3}}></i>インポート」に貼り付けることでグループを復元できます。
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <CopyButton text={groupShareText} label="📋 グループをコピー" />
+              <CopyButton text={groupShareText} label={<><i className="fa-regular fa-copy"></i> グループをコピー</>} />
             </div>
             <textarea readOnly value={groupShareText} rows={4} onClick={e => e.target.select()}
               style={{ width: '100%', marginTop: 10, fontSize: 10, fontFamily: 'monospace', background: 'var(--bg)', color: 'var(--bl)', border: '1px solid var(--bl-b)', resize: 'none' }} />
@@ -1760,8 +1626,7 @@ function App() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
-      <div style={{ minHeight: '100vh' }}>
+<div style={{ minHeight: '100vh' }}>
         <header style={{ background: 'linear-gradient(180deg, var(--head) 0%, var(--bg) 100%)', borderBottom: '1px solid var(--bd)', padding: '14px 20px 0', position: 'sticky', top: 0, zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <h1 className="app-title" style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 'clamp(13px, 2.6vw, 20px)', letterSpacing: '0.18em', fontWeight: 400 }}>
