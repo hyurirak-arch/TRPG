@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -I https://hyurirak-arch.github.io/TRPG/)",
+      "Bash(curl -s https://hyurirak-arch.github.io/TRPG/)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(curl -s https://api.github.com/repos/hyurirak-arch/TRPG/pages/builds/latest)"
+    ]
+  }
+}

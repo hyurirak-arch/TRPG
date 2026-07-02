@@ -556,8 +556,8 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
         </div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', flexShrink: 0 }}>
           <button className="btn-primary" onClick={onAdd} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 新規</button>
-          <button className="btn-ghost" onClick={onDuplicate} style={{ fontSize: 12 }}>複製</button>
-          {characters.length > 1 && <button className="btn-danger" onClick={() => onDelete(activeId)} style={{ fontSize: 12 }}>削除</button>}
+          <button className="btn-ghost" onClick={onDuplicate} style={{ fontSize: 12 }}><i class="fa-solid fa-copy"></i>複製</button>
+          {characters.length > 1 && <button className="btn-danger" onClick={() => onDelete(activeId)} style={{ fontSize: 12 }}><i class="fa-solid fa-trash-can"></i>削除</button>}
           <button className="btn-share" onClick={() => setPanel(panel === 'share' ? null : 'share')} style={{ fontSize: 12 }}><i class="fa-solid fa-right-from-bracket" style={{marginRight:5}}></i>共有</button>
           <button className="btn-green" onClick={() => setPanel(panel === 'import' ? null : 'import')} style={{ fontSize: 12 }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>インポート</button>
         </div>
@@ -941,7 +941,7 @@ function CharacterSheet({ character, onChange }) {
       <CollapsibleCard title="武器・攻撃"
         right={
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn-ghost" onClick={() => setShowPreset(s => !s)} style={{ fontSize: 12 }}>📋 プリセット</button>
+            <button className="btn-ghost" onClick={() => setShowPreset(s => !s)} style={{ fontSize: 12 }}><i class="fa-solid fa-gun"></i> プリセット</button>
             <button className="btn-primary" onClick={addWeapon} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 追加</button>
           </div>
         }>
