@@ -1072,7 +1072,7 @@ function CharacterSheet({ character, onChange }) {
       </CollapsibleCard>
 
       {/* Typed Memo */}
-      <CollapsibleCard title="テキストメモ">
+      <CollapsibleCard title="メモ">
         <LabeledTextarea label="メモ" value={character.typedMemo||''} onChange={e => set('typedMemo', e.target.value)}
           placeholder="自由にメモを書けます..." rows={5} />
       </CollapsibleCard>
