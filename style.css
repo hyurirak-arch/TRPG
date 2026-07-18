@@ -73,7 +73,7 @@ button { font-family: 'Special Elite', cursive; cursor: pointer; border: none; b
 
 .tab-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 16px; border-bottom: 1px solid var(--bd); }
 
-.abilities-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 8px; }
+.abilities-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
 .skills-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 5px; }
 .creature-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 .info-grid      { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0 14px; }
@@ -123,7 +123,6 @@ button { font-family: 'Special Elite', cursive; cursor: pointer; border: none; b
 .slide-in { animation: slide-in 0.2s ease-out; }
 
 @media (max-width: 640px) {
-  .abilities-grid { grid-template-columns: 1fr 1fr; }
   .skills-grid    { grid-template-columns: 1fr; }
   .creature-grid  { grid-template-columns: 1fr; }
   .info-grid      { grid-template-columns: 1fr 1fr; }
@@ -135,4 +134,4 @@ button { font-family: 'Special Elite', cursive; cursor: pointer; border: none; b
   .btn-import     { font-size: 10px !important; padding: 4px 8px !important; }
   .background-grid { grid-template-columns: 1fr; }
 }
-@media (max-width: 380px) { .abilities-grid { grid-template-columns: 1fr; } .info-grid { grid-template-columns: 1fr; } }
+@media (max-width: 380px) { .info-grid { grid-template-columns: 1fr; } }

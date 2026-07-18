@@ -160,6 +160,7 @@ function createCharacter(override) {
     currentHP: 10, currentMP: 10, currentSAN: 50,
     temporaryInsanity: false, indefiniteInsanity: false,
     skills: { ...DEFAULT_SKILLS },
+    skillBases: {}, skillDetails: {},
     customSkills: [],
     bonuses: { HP: 0, MP: 0, STR: 0, CON: 0, SIZ: 0, DEX: 0, APP: 0, INT: 0, POW: 0, EDU: 0, skills: [] },
     typedMemo: '', completedScenarios: '',
@@ -457,16 +458,22 @@ function CollapsibleCard({ title, titleSub, right, children, defaultOpen = true 
   return (
     <div className="card">
       <div onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flexWrap: 'wrap',
+        style={{ cursor: 'pointer',
                  borderBottom: open ? '1px solid var(--bd)' : 'none',
                  paddingBottom: open ? 8 : 0, marginBottom: open ? 10 : 0 }}>
-        <span className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>{title}</span>
-        {titleSub && <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>{titleSub}</span>}
-        <div style={{ flex: 1 }} />
-        {right && <div onClick={e => e.stopPropagation()}>{right}</div>}
-        <span style={{ color: 'var(--tx3)', fontSize: 12, flexShrink: 0, paddingLeft: 6, lineHeight: 1 }}>
-          {open ? '▼' : '▶'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>{title}</span>
+          {titleSub && <span style={{ fontSize: 10, color: 'var(--tx3)', fontFamily: 'inherit', textTransform: 'none' }}>{titleSub}</span>}
+          <div style={{ flex: 1 }} />
+          <span style={{ color: 'var(--tx3)', fontSize: 12, flexShrink: 0, paddingLeft: 6, lineHeight: 1 }}>
+            {open ? '▼' : '▶'}
+          </span>
+        </div>
+        {right && (
+          <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+            {right}
+          </div>
+        )}
       </div>
       {open && children}
     </div>
@@ -937,13 +944,30 @@ function CharacterSheet({ character, onChange }) {
   const [randomFlash,    setRandomFlash]    = useState(null);
   const [showPreset,     setShowPreset]     = useState(false);
   const [hideBaseSkills, setHideBaseSkills] = useState(false);
+  const [editSkillBase,  setEditSkillBase]  = useState(false);
   const [showAbilityRef, setShowAbilityRef] = useState(false);
   const [showSkillRef,   setShowSkillRef]   = useState(false);
   const fileRef = useRef(null);
 
   const set = (field, val) => onChange(prev => ({ ...prev, [field]: val }));
-  const setAbility = (key, raw) => onChange(prev => ({ ...prev, abilities: { ...prev.abilities, [key]: Math.max(0, parseInt(raw) || 0) } }));
+  const setAbility = (key, raw) => onChange(prev => {
+    const newAbilities = { ...prev.abilities, [key]: Math.max(0, parseInt(raw) || 0) };
+    const maxs = calcMaxStats(newAbilities);
+    return { ...prev, abilities: newAbilities, currentHP: maxs.maxHP, currentMP: maxs.maxMP, currentSAN: maxs.maxSAN };
+  });
   const setSkill   = (key, raw) => onChange(prev => ({ ...prev, skills: { ...prev.skills, [key]: Math.max(0, parseInt(raw) || 0) } }));
+  const setSkillBase = (key, defaultBase, raw) => onChange(prev => {
+    const oldBase = (prev.skillBases && prev.skillBases[key] !== undefined) ? prev.skillBases[key] : defaultBase;
+    const oldCur  = prev.skills[key] !== undefined ? prev.skills[key] : oldBase;
+    const added   = Math.max(0, oldCur - oldBase);
+    const newBase = Math.max(0, parseInt(raw) || 0);
+    return {
+      ...prev,
+      skillBases: { ...(prev.skillBases || {}), [key]: newBase },
+      skills: { ...prev.skills, [key]: newBase + added },
+    };
+  });
+  const setSkillDetail = (key, val) => onChange(prev => ({ ...prev, skillDetails: { ...(prev.skillDetails || {}), [key]: val } }));
 
   const handleRandom = () => {
     const newAbs = {};
@@ -978,8 +1002,10 @@ function CharacterSheet({ character, onChange }) {
 
   const occTotal = occFormula.calc(abilities);
   const intTotal = abilities.INT * 10;
+  const skillBases = character.skillBases || {};
   const usedSkillPoints = COC6_SKILLS.reduce((total, skill) => {
-    const base = skill.base === 'DEX×2' ? abilities.DEX * 2 : (typeof skill.base === 'number' ? skill.base : 0);
+    const defaultBase = skill.base === 'DEX×2' ? abilities.DEX * 2 : (typeof skill.base === 'number' ? skill.base : 0);
+    const base = typeof skill.base === 'number' && skillBases[skill.key] !== undefined ? skillBases[skill.key] : defaultBase;
     const cur = skills[skill.key] !== undefined ? skills[skill.key] : base;
     return total + Math.max(0, cur - base);
   }, 0) + (character.customSkills||[]).reduce((total, sk) => {
@@ -1120,6 +1146,9 @@ function CharacterSheet({ character, onChange }) {
       <CollapsibleCard title="技能リスト" titleSub="合計 基本値+ 加算"
         right={
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button className={editSkillBase ? 'btn-green' : 'btn-ghost'} onClick={() => setEditSkillBase(v => !v)} style={{ fontSize: 12 }}>
+              {editSkillBase ? '初期値編集を終了' : '✎ 初期値編集'}
+            </button>
             <button className="btn-ghost" onClick={() => setShowSkillRef(true)} style={{ fontSize: 12 }}>📖 参考値</button>
             <button className="btn-ghost" onClick={() => setHideBaseSkills(h => !h)} style={{ fontSize: 12, padding: '5px 10px' }}>
               {hideBaseSkills ? '全表示' : '未振り非表示'}
@@ -1135,16 +1164,30 @@ function CharacterSheet({ character, onChange }) {
         </div>
         <div className="skills-grid">
           {COC6_SKILLS.map(skill => {
-            const base    = skill.base === 'DEX×2' ? abilities.DEX * 2 : skill.base;
+            const isFormula = typeof skill.base !== 'number';
+            const defaultBase = skill.base === 'DEX×2' ? abilities.DEX * 2 : skill.base;
+            const base    = !isFormula && skillBases[skill.key] !== undefined ? skillBases[skill.key] : defaultBase;
             const numBase = typeof base === 'number' ? base : 0;
             const cur     = skills[skill.key] !== undefined ? skills[skill.key] : numBase;
             const added   = Math.max(0, cur - numBase);
             if (hideBaseSkills && added === 0) return null;
             return (
               <div key={skill.key} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '4px 8px' }}>
-                <span style={{ flex: 1, fontSize: 13, color: 'var(--tx)' }}>{skill.label}</span>
+                <span style={{ flex: skill.key === 'art' ? '0 0 auto' : 1, fontSize: 13, color: 'var(--tx)', whiteSpace: 'nowrap' }}>{skill.label}</span>
+                {skill.key === 'art' && (
+                  <input value={(character.skillDetails||{}).art || ''} onChange={e => setSkillDetail('art', e.target.value)}
+                    placeholder="詳細（絵画等）" title="詳細（例：絵画、彫刻、写真）"
+                    style={{ flex: 1, minWidth: 0, fontSize: 11, padding: '3px 5px' }} />
+                )}
                 <span style={{ fontSize: 15, color: 'var(--ac)', fontFamily: "'Cinzel', serif", width: 32, textAlign: 'right', flexShrink: 0 }}>{cur}</span>
-                <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0, whiteSpace: 'nowrap' }}>{base}+</span>
+                {editSkillBase && !isFormula ? (
+                  <ZeroBlankInput min="0" max="99" value={numBase} title="初期値"
+                    onChange={e => setSkillBase(skill.key, defaultBase, e.target.value)}
+                    style={{ width: 36, textAlign: 'center', padding: '3px 4px', fontSize: 13, lineHeight: '1.4' }} />
+                ) : (
+                  <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0, whiteSpace: 'nowrap' }}>{base}</span>
+                )}
+                <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0 }}>+</span>
                 <ZeroBlankInput min="0" value={added}
                   onChange={e => setSkill(skill.key, numBase + Math.max(0, parseInt(e.target.value) || 0))}
                   style={{ width: 42, textAlign: 'center', padding: '3px 4px', fontSize: 13, lineHeight: '1.4' }} />
@@ -1236,7 +1279,8 @@ function CharacterSheet({ character, onChange }) {
             <input value={e.name} onChange={ev => upEquip(e.id,'name',ev.target.value)} placeholder="アイテム名" style={{ flex: '2 1 90px', minWidth: 70 }} />
             <span style={{ fontSize: 11, color: 'var(--tx2)' }}>×</span>
             <input type="number" value={e.qty} onChange={ev => upEquip(e.id,'qty',ev.target.value)} placeholder="1" style={{ width: 44, textAlign: 'center' }} />
-            <input value={e.memo} onChange={ev => upEquip(e.id,'memo',ev.target.value)} placeholder="メモ" style={{ flex: '3 1 110px', minWidth: 80 }} />
+            <textarea value={e.memo} onChange={ev => upEquip(e.id,'memo',ev.target.value)} placeholder="メモ" rows={1}
+              style={{ flex: '3 1 110px', minWidth: 80, resize: 'vertical', lineHeight: 1.4, fontFamily: 'inherit', alignSelf: 'stretch' }} />
             <button className="btn-danger" onClick={() => delEquip(e.id)}>✕</button>
           </div>
         ))}
