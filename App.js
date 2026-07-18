@@ -135,6 +135,15 @@ const ABILITY_REFERENCE = {
   ],
 };
 
+const OPPOSED_PRESETS = [
+  { key: 'STR', short: 'STR対STR', desc: '腕相撲・押し合い・組み付きなど', activeLabel: '能動側 STR', passiveLabel: '受動側 STR' },
+  { key: 'CON', short: 'CON対CON', desc: '我慢比べ・飲み比べなど', activeLabel: '能動側 CON', passiveLabel: '受動側 CON' },
+  { key: 'POW', short: 'POW対POW', desc: '精神力比べ・威圧・催眠や魔術への抵抗など', activeLabel: '能動側 POW', passiveLabel: '受動側 POW' },
+  { key: 'DEX', short: 'DEX対DEX', desc: '俊敏さ比べ・追いかけっこなど', activeLabel: '能動側 DEX', passiveLabel: '受動側 DEX' },
+  { key: 'POT', short: 'CON対POT', desc: '毒・薬物への抵抗など', activeLabel: '能動側 CON', passiveLabel: '受動側 POT（効力）' },
+  { key: 'CUSTOM', short: 'カスタム', desc: '能動側・受動側の値を自由に入力', activeLabel: '能動側の値', passiveLabel: '受動側の値' },
+];
+
 const SKILL_REFERENCE = [
   ['01〜29%', 'その技能を知らないか、苦手とする。'],
   ['30〜39%', 'その技能の知識が少しはあるが所詮は素人の付け焼き刃。'],
@@ -313,6 +322,11 @@ function fmt2(n) { return n < 10 ? '0' + n : '' + n; }
 function nowTime() { const d = new Date(); return fmt2(d.getHours()) + ':' + fmt2(d.getMinutes()) + ':' + fmt2(d.getSeconds()); }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+function autoGrowTextarea(e) {
+  const el = e.target;
+  if (el.scrollHeight > el.clientHeight) el.style.height = el.scrollHeight + 'px';
+}
+
 function calcMaxStats(abilities) {
   return {
     maxHP:  Math.max(1, Math.floor((abilities.CON + abilities.SIZ) / 2)),
@@ -441,11 +455,13 @@ function LabeledInput({ label, value, onChange, type, placeholder, style }) {
 }
 
 function LabeledTextarea({ label, value, onChange, placeholder, rows }) {
+  const taRef = useRef(null);
+  useEffect(() => { if (taRef.current) autoGrowTextarea({ target: taRef.current }); }, []);
   return (
     <div style={{ marginBottom: 10 }}>
       <label style={LBL}>{label}</label>
       <div style={{ position: 'relative' }}>
-        <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows || 3}
+        <textarea ref={taRef} value={value} onChange={onChange} onInput={autoGrowTextarea} placeholder={placeholder} rows={rows || 3}
           style={{ width: '100%', resize: 'vertical', lineHeight: 1.6, paddingBottom: 16 }} />
         <span style={{ position: 'absolute', bottom: 5, right: 7, fontSize: 11, color: 'var(--tx3)', pointerEvents: 'none', lineHeight: 1, userSelect: 'none' }} title="ドラッグで拡大">⇲</span>
       </div>
@@ -1279,8 +1295,11 @@ function CharacterSheet({ character, onChange }) {
             <input value={e.name} onChange={ev => upEquip(e.id,'name',ev.target.value)} placeholder="アイテム名" style={{ flex: '2 1 90px', minWidth: 70 }} />
             <span style={{ fontSize: 11, color: 'var(--tx2)' }}>×</span>
             <input type="number" value={e.qty} onChange={ev => upEquip(e.id,'qty',ev.target.value)} placeholder="1" style={{ width: 44, textAlign: 'center' }} />
-            <textarea value={e.memo} onChange={ev => upEquip(e.id,'memo',ev.target.value)} placeholder="メモ" rows={1}
-              style={{ flex: '3 1 110px', minWidth: 80, resize: 'vertical', lineHeight: 1.4, fontFamily: 'inherit', alignSelf: 'stretch' }} />
+            <div style={{ position: 'relative', flex: '3 1 110px', minWidth: 80, alignSelf: 'stretch' }}>
+              <textarea value={e.memo} onChange={ev => upEquip(e.id,'memo',ev.target.value)} onInput={autoGrowTextarea} placeholder="メモ" rows={1}
+                style={{ width: '100%', height: '100%', resize: 'vertical', lineHeight: 1.4, fontFamily: 'inherit', paddingRight: 16 }} />
+              <span style={{ position: 'absolute', bottom: 3, right: 5, fontSize: 10, color: 'var(--tx3)', pointerEvents: 'none', lineHeight: 1, userSelect: 'none' }} title="ドラッグで拡大">⇲</span>
+            </div>
             <button className="btn-danger" onClick={() => delEquip(e.id)}>✕</button>
           </div>
         ))}
@@ -1389,6 +1408,10 @@ function DiceRoller() {
   const [customErr,  setCustomErr]  = useState('');
   const [skillPct,   setSkillPct]   = useState('');
   const [history,    setHistory]    = useState([]);
+  const [oppPreset,  setOppPreset]  = useState('STR');
+  const [oppLabel,   setOppLabel]   = useState('');
+  const [oppActive,  setOppActive]  = useState('10');
+  const [oppPassive, setOppPassive] = useState('10');
 
   const push = (entry) => setHistory(prev => [entry, ...prev].slice(0, 10));
   const doRoll = (formula, label) => {
@@ -1405,6 +1428,16 @@ function DiceRoller() {
     const roll = Math.ceil(Math.random() * 100);
     const j = judgeRoll(roll, s);
     const entry = { id: Date.now(), formula: 'd100', rolls: [roll], total: roll, label: '技能判定('+s+'%)', time: nowTime(), judgment: j };
+    setRollResult(entry); push(entry);
+  };
+  const oppDef  = OPPOSED_PRESETS.find(p => p.key === oppPreset) || OPPOSED_PRESETS[0];
+  const oppDiff = (parseInt(oppActive) || 0) - (parseInt(oppPassive) || 0);
+  const oppPct  = Math.max(0, Math.min(100, 50 + oppDiff * 5));
+  const doOpposedRoll = () => {
+    const roll = Math.ceil(Math.random() * 100);
+    const j = judgeRoll(roll, oppPct);
+    const lbl = (oppPreset === 'CUSTOM' ? (oppLabel.trim() || 'カスタム対抗ロール') : oppDef.short) + '（' + oppPct + '%）';
+    const entry = { id: Date.now(), formula: 'd100', rolls: [roll], total: roll, label: lbl, time: nowTime(), judgment: j };
     setRollResult(entry); push(entry);
   };
   const n = Math.max(1, Math.min(20, diceCount));
@@ -1454,6 +1487,41 @@ function DiceRoller() {
             </div>
             <div style={{ fontSize: 11, color: 'var(--tx3)', lineHeight: 1.9 }}>
               <span style={{ color: 'var(--ac)' }}>イマジナリー</span>: ≤値÷5　<span style={{ color: 'var(--gr)' }}>困難成功</span>: ≤値÷2　<span style={{ color: 'var(--gr)' }}>通常成功</span>: ≤値　<span style={{ color: 'var(--re2)' }}>ファンブル</span>: 96〜100(値&lt;50)/100(値≥50)
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="section-title">対抗ロール</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {OPPOSED_PRESETS.map(p => (
+                <button key={p.key} className={oppPreset === p.key ? 'btn-primary' : 'btn-ghost'}
+                  onClick={() => setOppPreset(p.key)} style={{ fontSize: 11, padding: '5px 10px' }}>
+                  {p.short}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--tx3)', marginBottom: 10 }}>{oppDef.desc}</div>
+            {oppPreset === 'CUSTOM' && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={LBL}>ロール名（任意）</label>
+                <input value={oppLabel} onChange={e => setOppLabel(e.target.value)} placeholder="例: 説得 対 心理学" style={{ width: '100%' }} />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 10 }}>
+              <div>
+                <label style={LBL}>{oppDef.activeLabel}</label>
+                <input type="number" value={oppActive} onChange={e => setOppActive(e.target.value)} style={{ width: 100 }} />
+              </div>
+              <span style={{ fontSize: 15, color: 'var(--tx3)', paddingBottom: 7 }}>対</span>
+              <div>
+                <label style={LBL}>{oppDef.passiveLabel}</label>
+                <input type="number" value={oppPassive} onChange={e => setOppPassive(e.target.value)} style={{ width: 100 }} />
+              </div>
+              <button className="btn-primary" onClick={doOpposedRoll}>ロール</button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--tx2)' }}>
+              能動側成功率: <span style={{ color: 'var(--ac)', fontFamily: "'Cinzel', serif", fontSize: 16 }}>{oppPct}%</span>
+              <span style={{ color: 'var(--tx3)', fontSize: 10 }}> （50 ＋（{oppActive || 0}－{oppPassive || 0}）×5）</span>
             </div>
           </div>
         </div>
@@ -1522,8 +1590,11 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
     <div style={{ padding: '16px 20px', maxWidth: 960, margin: '0 auto' }}>
       <div className="card">
         <div className="section-title">セッションノート</div>
-        <textarea value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} placeholder="セッションの出来事、重要な情報、謎のメモ..."
-          style={{ width: '100%', minHeight: 140, resize: 'vertical', lineHeight: 1.7 }} />
+        <div style={{ position: 'relative' }}>
+          <textarea value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} onInput={autoGrowTextarea} placeholder="セッションの出来事、重要な情報、謎のメモ..."
+            style={{ width: '100%', minHeight: 140, resize: 'vertical', lineHeight: 1.7, paddingRight: 16 }} />
+          <span style={{ position: 'absolute', bottom: 5, right: 7, fontSize: 11, color: 'var(--tx3)', pointerEvents: 'none', lineHeight: 1, userSelect: 'none' }} title="ドラッグで拡大">⇲</span>
+        </div>
         <div style={{ textAlign: 'right', fontSize: 10, color: 'var(--tx3)', marginTop: 4 }}>自動保存中</div>
       </div>
       <div className="session-grid">
