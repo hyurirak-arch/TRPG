@@ -52,6 +52,97 @@ const ABILITY_ROLL = {
   POW: '3d6', EDU: '3d6+3',
 };
 
+const ABILITY_JP = {
+  STR: '筋力', CON: '体力', SIZ: '体格',
+  DEX: '敏捷性', APP: '外見', INT: '知性',
+  POW: '精神力', EDU: '教育',
+};
+
+const ABILITY_EN = {
+  STR: 'Strength', CON: 'Constitution', SIZ: 'Size',
+  DEX: 'Dexterity', APP: 'Appearance', INT: 'Intelligence',
+  POW: 'Power', EDU: 'Education',
+};
+
+const ABILITY_REFERENCE = {
+  STR: [
+    ['03〜04', '箸より重いものが持てない'],
+    ['05〜06', '貧弱'],
+    ['07〜08', '運動嫌い'],
+    ['09〜12', '普通'],
+    ['13〜14', '運動好き'],
+    ['15〜16', 'アスリート'],
+    ['17〜18', '見てわかるマッチョ'],
+  ],
+  CON: [
+    ['03〜04', '一日の大半寝てる'],
+    ['05〜06', '病弱'],
+    ['07〜08', 'すぐへばる'],
+    ['09〜12', '普通'],
+    ['13〜14', '丈夫'],
+    ['15〜16', '病気したことない'],
+    ['17〜18', '不眠不休で働けます'],
+  ],
+  POW: [
+    ['03', '精神を病んでいる'],
+    ['04', '過去に大きなトラウマがある'],
+    ['05〜06', 'すぐパニックになる'],
+    ['07〜08', '打たれ弱い'],
+    ['09〜12', '普通'],
+    ['13〜14', '打たれ強い'],
+    ['15〜16', '強靭な精神の持ち主'],
+    ['17', 'その筋の修行をしている人'],
+    ['18', '聖人'],
+  ],
+  DEX: [
+    ['03〜04', '触れるもの皆傷付ける'],
+    ['05〜06', '料理や片付けが苦手'],
+    ['07〜08', '美術や技術が苦手'],
+    ['09〜12', '普通'],
+    ['13〜14', '美術や技術が得意'],
+    ['15〜16', '技術職につける'],
+    ['17〜18', 'ゴッドハンド'],
+  ],
+  APP: [
+    ['03〜04', '目を背けられる'],
+    ['05〜06', 'ブス'],
+    ['07〜08', 'チョイブス'],
+    ['09〜12', '普通'],
+    ['13〜14', 'チョイモテ'],
+    ['15〜16', '同性にも好かれる'],
+    ['17〜18', '誰もが振り返る'],
+  ],
+  SIZ: [
+    ['03', '120〜125cm'], ['04', '125〜130cm'], ['05', '130〜135cm'], ['06', '135〜140cm'],
+    ['07', '140〜145cm'], ['08', '145〜150cm'], ['09', '150〜155cm'], ['10', '155〜160cm'],
+    ['11', '160〜165cm'], ['12', '165〜170cm'], ['13', '170〜175cm'], ['14', '175〜180cm'],
+    ['15', '180〜185cm'], ['16', '185〜190cm'], ['17', '190〜195cm'], ['18', '195〜200cm'],
+  ],
+  INT: [
+    ['08〜09', '物覚えが悪い'],
+    ['10〜11', '頭が固い'],
+    ['12〜13', '普通'],
+    ['14〜15', '柔軟な発想ができる'],
+    ['16〜17', 'キレ者'],
+    ['18', 'アインシュタイン'],
+  ],
+  EDU: [
+    ['06', '中学1年程度'], ['07', '中学2年程度'], ['08', '中学3年程度'],
+    ['09', '高校1年 または中卒10年以内'], ['10', '高校2年 または中卒20年以内'], ['11', '高校3年 または中卒30年以内'],
+    ['12', '大学1年 または高卒10年程度'], ['13', '大学2年 または高卒20年程度'], ['14', '大学3年 または高卒30年程度'], ['15', '大学4年 または高卒40年程度'],
+    ['16', '大学院1年 または大卒10年程度'], ['17', '大学院2年 または大卒20年程度'], ['18', '大学院3年 または大卒30年程度'], ['19', '大学院4年 または大卒40年程度'],
+    ['20', '大学院5年 または院卒10年程度'], ['21', '大学院6年 または院卒20年程度'],
+  ],
+};
+
+const SKILL_REFERENCE = [
+  ['01〜29%', 'その技能を知らないか、苦手とする。'],
+  ['30〜39%', 'その技能の知識が少しはあるが所詮は素人の付け焼き刃。'],
+  ['40〜59%', 'その技能で仕事が出来る。報酬を貰えるレベルである。一般人が技能を極めて到達する限界。'],
+  ['60〜79%', 'その技能の専門家。ここまで到達できる人間はそうそう居ない。天才的な才能の持ち主。'],
+  ['81〜99%', 'その道の達人。場合によっては、後世に名を残す事が出来るレベル。'],
+];
+
 const DEFAULT_SKILLS = COC6_SKILLS.reduce((acc, s) => {
   acc[s.key] = typeof s.base === 'number' ? s.base : 0;
   return acc;
@@ -292,6 +383,28 @@ function copyText(text) {
   return Promise.resolve();
 }
 
+function sanitizeFilename(name) {
+  return (name || 'data').replace(/[\\/:*?"<>|]/g, '_');
+}
+
+function readDroppedFile(e, onLoad) {
+  e.preventDefault();
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => onLoad(ev.target.result);
+  reader.readAsText(file);
+}
+
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function charToMember(char) {
   const { imageData, ...snapshot } = char;
   const { maxHP, maxMP, maxSAN } = calcMaxStats(char.abilities);
@@ -344,7 +457,7 @@ function CollapsibleCard({ title, titleSub, right, children, defaultOpen = true 
   return (
     <div className="card">
       <div onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flexWrap: 'wrap',
                  borderBottom: open ? '1px solid var(--bd)' : 'none',
                  paddingBottom: open ? 8 : 0, marginBottom: open ? 10 : 0 }}>
         <span className="section-title" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>{title}</span>
@@ -360,12 +473,29 @@ function CollapsibleCard({ title, titleSub, right, children, defaultOpen = true 
   );
 }
 
+function ZeroBlankInput({ value, onChange, min, max, style, placeholder, title, className }) {
+  const [focused, setFocused] = useState(false);
+  const isZero = value === 0 || value === '0';
+  const display = focused && isZero ? '' : value;
+  return (
+    <input type="number" min={min} max={max} title={title} className={className}
+      value={display} placeholder={placeholder}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChange={onChange}
+      style={style} />
+  );
+}
+
 function AbilityRow({ label, value, onChange, flash }) {
   return (
     <div className={flash ? 'random-flash' : ''}
       style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '5px 10px' }}>
-      <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 13, width: 32, flexShrink: 0 }}>{label}</span>
-      <input type="number" min="0" max="99" value={value} onChange={onChange}
+      <span style={{ width: 56, flexShrink: 0, lineHeight: 1.2 }}>
+        <span style={{ display: 'block', fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 13 }}>{label}</span>
+        <span style={{ display: 'block', fontSize: 9, color: 'var(--tx3)' }}>{ABILITY_EN[label]}</span>
+      </span>
+      <ZeroBlankInput min="0" max="99" value={value} onChange={onChange}
         style={{ width: 50, textAlign: 'center', fontSize: 15, padding: '4px 6px', lineHeight: '1.4' }} />
       <span style={{ color: 'var(--tx3)', fontSize: 11, flexShrink: 0 }}>×5</span>
       <span style={{ color: 'var(--tx)', fontSize: 14, minWidth: 28, textAlign: 'right' }}>{value * 5}</span>
@@ -401,6 +531,34 @@ function CopyButton({ text, label }) {
     <button className="btn-share" onClick={handle} style={{ minWidth: 80 }}>
       {copied ? '✓ コピー済' : (label || <><i className="fa-regular fa-copy"></i> コピー</>)}
     </button>
+  );
+}
+
+function DownloadButton({ text, filename, label }) {
+  return (
+    <button className="btn-ghost" onClick={() => downloadText(filename, text)} style={{ minWidth: 80 }}>
+      {label || <><i className="fa-solid fa-download"></i> ダウンロード</>}
+    </button>
+  );
+}
+
+function FileImportButton({ onLoad, label }) {
+  const inputRef = useRef(null);
+  const handleChange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => onLoad(ev.target.result);
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+  return (
+    <>
+      <input ref={inputRef} type="file" accept=".txt" style={{ display: 'none' }} onChange={handleChange} />
+      <button className="btn-ghost" onClick={() => inputRef.current.click()} style={{ fontSize: 12 }}>
+        {label || <><i className="fa-solid fa-file-arrow-up"></i> ファイルから読込</>}
+      </button>
+    </>
   );
 }
 
@@ -529,6 +687,7 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
   const [panel, setPanel]         = useState(null); // 'share' | 'import'
   const [importText, setImportText] = useState('');
   const [importErr, setImportErr]   = useState('');
+  const [dragOver, setDragOver]     = useState(false);
   const active = characters.find(c => c.id === activeId) || characters[0];
 
   const shareText = active
@@ -554,12 +713,12 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', minWidth: 0 }}>
           <button className="btn-primary" onClick={onAdd} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 新規</button>
-          <button className="btn-ghost" onClick={onDuplicate} style={{ fontSize: 12 }}><i class="fa-solid fa-copy"></i>複製</button>
-          {characters.length > 1 && <button className="btn-danger" onClick={() => onDelete(activeId)} style={{ fontSize: 12 }}><i class="fa-solid fa-trash-can"></i>削除</button>}
+          <button className="btn-ghost" onClick={onDuplicate} style={{ fontSize: 12 }}><i class="fa-solid fa-copy"></i> 複製</button>
+          {characters.length > 1 && <button className="btn-danger" onClick={() => onDelete(activeId)} style={{ fontSize: 12 }}><i class="fa-solid fa-trash-can"></i> 削除</button>}
           <button className="btn-share" onClick={() => setPanel(panel === 'share' ? null : 'share')} style={{ fontSize: 12 }}><i class="fa-solid fa-right-from-bracket" style={{marginRight:5}}></i>共有</button>
-          <button className="btn-green" onClick={() => setPanel(panel === 'import' ? null : 'import')} style={{ fontSize: 12 }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>インポート</button>
+          <button className="btn-green btn-import" onClick={() => setPanel(panel === 'import' ? null : 'import')} style={{ fontSize: 12 }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>インポート</button>
         </div>
       </div>
 
@@ -579,8 +738,9 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
           <textarea readOnly value={shareText} rows={5}
             style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', background: 'var(--bg)', color: 'var(--bl)', border: '1px solid var(--bl-b)', resize: 'none' }}
             onClick={e => e.target.select()} />
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <CopyButton text={shareText} label={<><i className="fa-regular fa-copy"></i> コピー</>} />
+            <DownloadButton text={shareText} filename={'CoC6_探索者_' + sanitizeFilename(active.name || '名無し') + '.txt'} />
             <button className="btn-ghost" onClick={() => setPanel(null)} style={{ fontSize: 12 }}>閉じる</button>
           </div>
         </div>
@@ -589,18 +749,91 @@ function CharacterPanel({ characters, activeId, onSelect, onAdd, onDuplicate, on
       {panel === 'import' && (
         <div className="import-box slide-in">
           <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif", letterSpacing: '0.06em' }}>
-            <i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>共有テキストを貼り付けてインポート
+            <i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>共有テキストを貼り付け、またはファイルを読み込んでインポート
           </div>
           <textarea value={importText} onChange={e => { setImportText(e.target.value); setImportErr(''); }}
-            placeholder="━━━ CoC6 探索者... のテキストを貼り付け ━━━" rows={5}
-            style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none' }} />
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { setDragOver(false); readDroppedFile(e, text => { setImportText(text); setImportErr(''); }); }}
+            placeholder="━━━ CoC6 探索者... のテキストを貼り付け、またはファイルをドラッグ＆ドロップ ━━━" rows={5}
+            style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none', border: dragOver ? '1px dashed var(--gr)' : undefined, background: dragOver ? 'var(--gr-bg)' : undefined }} />
           {importErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 4 }}>{importErr}</div>}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <button className="btn-green" onClick={handleImport} style={{ fontSize: 12 }}>インポートする</button>
+            <FileImportButton onLoad={text => { setImportText(text); setImportErr(''); }} />
             <button className="btn-ghost" onClick={() => { setPanel(null); setImportText(''); setImportErr(''); }} style={{ fontSize: 12 }}>閉じる</button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// ABILITY REFERENCE MODAL
+// ============================================================
+
+function AbilityReferenceModal({ onClose }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target.className === 'modal-overlay' && onClose()}>
+      <div className="modal-inner" style={{ maxWidth: 920 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <h2 style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 18, letterSpacing: '0.06em' }}>能力値 参考値</h2>
+          <button className="btn-ghost" onClick={onClose} style={{ fontSize: 12 }}>閉じる</button>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--tx3)', marginBottom: 14 }}>
+          出典: <a href="https://kyo-san-dayo.jimdofree.com/%E8%83%BD%E5%8A%9B%E5%80%A4%E3%81%AE%E5%8F%82%E8%80%83/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bl)' }}>教さんだよ「能力値の参考」</a>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, maxHeight: '65vh', overflowY: 'auto', paddingRight: 4 }}>
+          {Object.entries(ABILITY_REFERENCE).map(([ab, rows]) => (
+            <div key={ab} style={{ background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 4, padding: '10px 12px' }}>
+              <div style={{ marginBottom: 6 }}>
+                <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 14 }}>{ab}</span>
+                <span style={{ fontSize: 10, color: 'var(--tx3)', marginLeft: 6 }}>{ABILITY_JP[ab]}</span>
+              </div>
+              <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                <tbody>
+                  {rows.map(([range, desc]) => (
+                    <tr key={range}>
+                      <td style={{ color: 'var(--tx3)', padding: '2px 8px 2px 0', whiteSpace: 'nowrap', verticalAlign: 'top', fontFamily: "'Cinzel', serif" }}>{range}</td>
+                      <td style={{ color: 'var(--tx)', padding: '2px 0' }}>{desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkillReferenceModal({ onClose }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target.className === 'modal-overlay' && onClose()}>
+      <div className="modal-inner" style={{ maxWidth: 640 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <h2 style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 18, letterSpacing: '0.06em' }}>技能値 参考値</h2>
+          <button className="btn-ghost" onClick={onClose} style={{ fontSize: 12 }}>閉じる</button>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--tx3)', marginBottom: 14 }}>
+          出典: <a href="https://w.atwiki.jp/picotan2015/pages/85.html" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bl)' }}>picotan2015「技能値の目安」</a>
+        </div>
+        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+          <tbody>
+            {SKILL_REFERENCE.map(([range, desc]) => (
+              <tr key={range} style={{ borderBottom: '1px solid var(--bd)' }}>
+                <td style={{ color: 'var(--ac)', fontFamily: "'Cinzel', serif", padding: '8px 12px 8px 0', whiteSpace: 'nowrap', verticalAlign: 'top' }}>{range}</td>
+                <td style={{ color: 'var(--tx)', padding: '8px 0', lineHeight: 1.6 }}>{desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ fontSize: 11, color: 'var(--tx3)', marginTop: 12, lineHeight: 1.6 }}>
+          ※ 技能値に60%以上振る場合は、キャラクターの背景にその技能に関する理由付けをすると良いでしょう。
+        </div>
+      </div>
     </div>
   );
 }
@@ -704,6 +937,8 @@ function CharacterSheet({ character, onChange }) {
   const [randomFlash,    setRandomFlash]    = useState(null);
   const [showPreset,     setShowPreset]     = useState(false);
   const [hideBaseSkills, setHideBaseSkills] = useState(false);
+  const [showAbilityRef, setShowAbilityRef] = useState(false);
+  const [showSkillRef,   setShowSkillRef]   = useState(false);
   const fileRef = useRef(null);
 
   const set = (field, val) => onChange(prev => ({ ...prev, [field]: val }));
@@ -827,7 +1062,7 @@ function CharacterSheet({ character, onChange }) {
 
       {/* Background */}
       <CollapsibleCard title="外見・性格・背景">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0 14px' }}>
+        <div className="background-grid">
           <LabeledTextarea label="外見" value={character.appearance||''} onChange={e => set('appearance', e.target.value)} placeholder="容姿、服装、特徴..." rows={3} />
           <LabeledTextarea label="性格・信条" value={character.personality||''} onChange={e => set('personality', e.target.value)} placeholder="性格、信念、行動原理..." rows={3} />
           <LabeledTextarea label="背景・経歴" value={character.background||''} onChange={e => set('background', e.target.value)} placeholder="生い立ち、重要な出来事..." rows={3} />
@@ -836,7 +1071,12 @@ function CharacterSheet({ character, onChange }) {
 
       {/* Abilities */}
       <CollapsibleCard title="能力値" titleSub="（右列 = ×5 基本技能値）"
-        right={<button className="btn-green" onClick={handleRandom} style={{ fontSize: 12 }}>🎲 ランダム決定</button>}>
+        right={
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button className="btn-ghost" onClick={() => setShowAbilityRef(true)} style={{ fontSize: 12 }}>📖 参考値</button>
+            <button className="btn-green" onClick={handleRandom} style={{ fontSize: 12 }}>🎲 ランダム決定</button>
+          </div>
+        }>
         <div className="abilities-grid">
           {Object.keys(ABILITY_ROLL).map(ab => (
             <AbilityRow key={ab} label={ab} value={abilities[ab]} flash={!!randomFlash} onChange={e => setAbility(ab, e.target.value)} />
@@ -845,7 +1085,11 @@ function CharacterSheet({ character, onChange }) {
         <div style={{ marginTop: 10, fontSize: 11, color: 'var(--tx3)', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           {Object.entries(ABILITY_ROLL).map(([ab, f]) => <span key={ab}><span style={{ color: 'var(--tx3)' }}>{ab}:</span> {f}</span>)}
         </div>
+        <div style={{ marginTop: 4, fontSize: 10, color: 'var(--tx3)', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          {Object.entries(ABILITY_JP).map(([ab, jp]) => <span key={ab}><span style={{ color: 'var(--tx3)' }}>{ab}:</span> {jp}</span>)}
+        </div>
       </CollapsibleCard>
+      {showAbilityRef && <AbilityReferenceModal onClose={() => setShowAbilityRef(false)} />}
 
       {/* Derived */}
       <CollapsibleCard title="副次能力値">
@@ -875,7 +1119,8 @@ function CharacterSheet({ character, onChange }) {
       {/* Skills */}
       <CollapsibleCard title="技能リスト" titleSub="合計 基本値+ 加算"
         right={
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button className="btn-ghost" onClick={() => setShowSkillRef(true)} style={{ fontSize: 12 }}>📖 参考値</button>
             <button className="btn-ghost" onClick={() => setHideBaseSkills(h => !h)} style={{ fontSize: 12, padding: '5px 10px' }}>
               {hideBaseSkills ? '全表示' : '未振り非表示'}
             </button>
@@ -900,7 +1145,7 @@ function CharacterSheet({ character, onChange }) {
                 <span style={{ flex: 1, fontSize: 13, color: 'var(--tx)' }}>{skill.label}</span>
                 <span style={{ fontSize: 15, color: 'var(--ac)', fontFamily: "'Cinzel', serif", width: 32, textAlign: 'right', flexShrink: 0 }}>{cur}</span>
                 <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0, whiteSpace: 'nowrap' }}>{base}+</span>
-                <input type="number" min="0" value={added}
+                <ZeroBlankInput min="0" value={added}
                   onChange={e => setSkill(skill.key, numBase + Math.max(0, parseInt(e.target.value) || 0))}
                   style={{ width: 42, textAlign: 'center', padding: '3px 4px', fontSize: 13, lineHeight: '1.4' }} />
               </div>
@@ -920,11 +1165,11 @@ function CharacterSheet({ character, onChange }) {
                     <input value={sk.label} onChange={e => upCustomSkill(sk.id,'label',e.target.value)}
                       placeholder="技能名…" style={{ flex: 1, minWidth: 0, fontSize: 12, background: 'transparent', border: 'none', outline: 'none', color: 'var(--tx)', padding: 0 }} />
                     <span style={{ fontSize: 15, color: 'var(--ac)', fontFamily: "'Cinzel', serif", width: 28, textAlign: 'right', flexShrink: 0 }}>{skTotal}</span>
-                    <input type="number" min="0" max="99" value={skBase}
+                    <ZeroBlankInput min="0" max="99" value={skBase}
                       onChange={e => upCustomSkill(sk.id,'base',Math.max(0,parseInt(e.target.value)||0))}
                       title="初期値" style={{ width: 36, textAlign: 'center', padding: '3px 4px', fontSize: 12, lineHeight: '1.4' }} />
                     <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0 }}>+</span>
-                    <input type="number" min="0" max="99" value={skAdded}
+                    <ZeroBlankInput min="0" max="99" value={skAdded}
                       onChange={e => upCustomSkill(sk.id,'added',Math.max(0,parseInt(e.target.value)||0))}
                       title="加算ポイント" style={{ width: 36, textAlign: 'center', padding: '3px 4px', fontSize: 12, lineHeight: '1.4' }} />
                     <button onClick={() => delCustomSkill(sk.id)}
@@ -936,6 +1181,7 @@ function CharacterSheet({ character, onChange }) {
           </div>
         )}
       </CollapsibleCard>
+      {showSkillRef && <SkillReferenceModal onClose={() => setShowSkillRef(false)} />}
 
       {/* Weapons */}
       <CollapsibleCard title="武器・攻撃"
@@ -1020,7 +1266,7 @@ function CharacterSheet({ character, onChange }) {
               <div style={{ fontSize: 10, color: col, fontFamily: "'Cinzel', serif", marginBottom: 5 }}>{key} ボーナス</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ fontSize: 13, color: 'var(--tx3)' }}>+</span>
-                <input type="number" min="0" value={bonuses[key]||0} onChange={e => setBonus(key, Math.max(0, parseInt(e.target.value)||0))}
+                <ZeroBlankInput min="0" value={bonuses[key]||0} onChange={e => setBonus(key, Math.max(0, parseInt(e.target.value)||0))}
                   style={{ width: 54, textAlign: 'center', padding: '4px 6px', fontSize: 14 }} />
                 {(bonuses[key]||0) > 0 && <span style={{ fontSize: 11, color: col }}>→ {key==='HP' ? maxHP : maxMP}</span>}
               </div>
@@ -1033,9 +1279,9 @@ function CharacterSheet({ character, onChange }) {
           <div className="abilities-grid">
             {Object.keys(ABILITY_ROLL).map(ab => (
               <div key={ab} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg3)', border: '1px solid var(--bd)', borderRadius: 3, padding: '5px 10px' }}>
-                <span style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 12, width: 32, flexShrink: 0 }}>{ab}</span>
+                <span title={ABILITY_JP[ab]} style={{ fontFamily: "'Cinzel', serif", color: 'var(--ac)', fontSize: 12, width: 32, flexShrink: 0 }}>{ab}</span>
                 <span style={{ fontSize: 11, color: 'var(--tx3)' }}>+</span>
-                <input type="number" min="0" value={bonuses[ab]||0} onChange={e => setBonus(ab, Math.max(0, parseInt(e.target.value)||0))}
+                <ZeroBlankInput min="0" value={bonuses[ab]||0} onChange={e => setBonus(ab, Math.max(0, parseInt(e.target.value)||0))}
                   style={{ width: 40, textAlign: 'center', padding: '3px 5px', fontSize: 13 }} />
                 {(bonuses[ab]||0) > 0 && <span style={{ fontSize: 11, color: 'var(--gr)', marginLeft: 2 }}>{abilities[ab]} → <span style={{ fontFamily: "'Cinzel', serif" }}>{abilities[ab] + (bonuses[ab]||0)}</span></span>}
               </div>
@@ -1055,7 +1301,7 @@ function CharacterSheet({ character, onChange }) {
                 <input value={sk.label} onChange={e => upBonusSkill(sk.id,'label',e.target.value)}
                   placeholder="技能名…" style={{ flex: 1, fontSize: 12, background: 'transparent', border: 'none', outline: 'none', color: 'var(--tx)', padding: 0 }} />
                 <span style={{ fontSize: 11, color: 'var(--tx3)' }}>+</span>
-                <input type="number" min="0" value={sk.value||0} onChange={e => upBonusSkill(sk.id,'value',Math.max(0,parseInt(e.target.value)||0))}
+                <ZeroBlankInput min="0" value={sk.value||0} onChange={e => upBonusSkill(sk.id,'value',Math.max(0,parseInt(e.target.value)||0))}
                   style={{ width: 44, textAlign: 'center', padding: '3px 4px', fontSize: 13 }} />
                 <button onClick={() => delBonusSkill(sk.id)}
                   style={{ background: 'transparent', color: 'var(--tx3)', border: 'none', fontSize: 12, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>✕</button>
@@ -1317,6 +1563,8 @@ function GroupManager({ groups, setGroups, localCharacters }) {
   const [showGroupImport, setShowGroupImport] = useState(false);
   const [groupImportText, setGroupImportText] = useState('');
   const [groupImportErr,  setGroupImportErr]  = useState('');
+  const [memberDragOver, setMemberDragOver] = useState(false);
+  const [groupDragOver,  setGroupDragOver]  = useState(false);
 
   useEffect(() => { try { localStorage.setItem('coc6-active-group', activeGroupId || ''); } catch {} }, [activeGroupId]);
 
@@ -1378,21 +1626,26 @@ function GroupManager({ groups, setGroups, localCharacters }) {
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 5, minWidth: 0, flexWrap: 'wrap' }}>
             <button className="btn-primary" onClick={addGroup} style={{ fontSize: 12, padding: '5px 12px' }}>＋ 新規</button>
-            {activeGroup && groups.length > 1 && <button className="btn-danger" onClick={() => delGroup(activeGroup.id)} style={{ fontSize: 12 }}>削除</button>}
-            <button className="btn-share" onClick={() => setShowGroupImport(s => !s)} style={{ fontSize: 12 }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>インポート</button>
+            {activeGroup && groups.length > 1 && <button className="btn-danger" onClick={() => delGroup(activeGroup.id)} style={{ fontSize: 12 }}> 削除</button>}
+            <button className="btn-share btn-import" onClick={() => setShowGroupImport(s => !s)} style={{ fontSize: 12 }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>インポート</button>
           </div>
         </div>
 
         {showGroupImport && (
           <div className="import-box slide-in">
-            <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>グループ共有テキストを貼り付け</div>
+            <div style={{ fontSize: 11, color: 'var(--gr)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>グループ共有テキストを貼り付け、またはファイルを読み込み</div>
             <textarea value={groupImportText} onChange={e => { setGroupImportText(e.target.value); setGroupImportErr(''); }}
-              placeholder="━━━ CoC6 グループ... のテキストを貼り付け ━━━" rows={4} style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none' }} />
+              onDragOver={e => { e.preventDefault(); setGroupDragOver(true); }}
+              onDragLeave={() => setGroupDragOver(false)}
+              onDrop={e => { setGroupDragOver(false); readDroppedFile(e, text => { setGroupImportText(text); setGroupImportErr(''); }); }}
+              placeholder="━━━ CoC6 グループ... のテキストを貼り付け、またはファイルをドラッグ＆ドロップ ━━━" rows={4}
+              style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none', border: groupDragOver ? '1px dashed var(--gr)' : undefined, background: groupDragOver ? 'var(--gr-bg)' : undefined }} />
             {groupImportErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 4 }}>{groupImportErr}</div>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               <button className="btn-green" onClick={importGroup} style={{ fontSize: 12 }}>インポートする</button>
+              <FileImportButton onLoad={text => { setGroupImportText(text); setGroupImportErr(''); }} />
               <button className="btn-ghost" onClick={() => { setShowGroupImport(false); setGroupImportText(''); setGroupImportErr(''); }} style={{ fontSize: 12 }}>閉じる</button>
             </div>
           </div>
@@ -1410,7 +1663,7 @@ function GroupManager({ groups, setGroups, localCharacters }) {
           {/* Group Info */}
           <div className="card">
             <div className="section-title">セッション情報</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0 14px' }}>
+            <div className="info-grid">
               <LabeledInput label="セッション名" value={activeGroup.name} onChange={e => upGroup({ name: e.target.value })} placeholder="セッション名..." />
               <LabeledInput label="GM（ゲームマスター）" value={activeGroup.gm||''} onChange={e => upGroup({ gm: e.target.value })} placeholder="GMの名前..." />
             </div>
@@ -1450,12 +1703,17 @@ function GroupManager({ groups, setGroups, localCharacters }) {
 
             {showImportMember && (
               <div className="import-box slide-in" style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: 'var(--bl)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>プレイヤーから受け取った探索者テキストを貼り付け:</div>
+                <div style={{ fontSize: 11, color: 'var(--bl)', marginBottom: 8, fontFamily: "'Cinzel', serif" }}><i class="fa-solid fa-right-to-bracket" style={{marginRight:5}}></i>プレイヤーから受け取った探索者テキストを貼り付け、またはファイルを読み込み:</div>
                 <textarea value={memberImportText} onChange={e => { setMemberImportText(e.target.value); setMemberImportErr(''); }}
-                  placeholder="━━━ CoC6 探索者: ... のテキストを貼り付け ━━━" rows={4} style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none' }} />
+                  onDragOver={e => { e.preventDefault(); setMemberDragOver(true); }}
+                  onDragLeave={() => setMemberDragOver(false)}
+                  onDrop={e => { setMemberDragOver(false); readDroppedFile(e, text => { setMemberImportText(text); setMemberImportErr(''); }); }}
+                  placeholder="━━━ CoC6 探索者: ... のテキストを貼り付け、またはファイルをドラッグ＆ドロップ ━━━" rows={4}
+                  style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', resize: 'none', border: memberDragOver ? '1px dashed var(--bl)' : undefined, background: memberDragOver ? 'var(--bl-bg)' : undefined }} />
                 {memberImportErr && <div style={{ color: 'var(--re2)', fontSize: 12, marginTop: 4 }}>{memberImportErr}</div>}
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                   <button className="btn-green" onClick={importMember} style={{ fontSize: 12 }}>追加する</button>
+                  <FileImportButton onLoad={text => { setMemberImportText(text); setMemberImportErr(''); }} />
                   <button className="btn-ghost" onClick={() => { setShowImportMember(false); setMemberImportText(''); setMemberImportErr(''); }} style={{ fontSize: 12 }}>閉じる</button>
                 </div>
               </div>
@@ -1510,8 +1768,9 @@ function GroupManager({ groups, setGroups, localCharacters }) {
               グループ全体（メンバーのキャラデータ・ストーリー・ログ含む）をテキストにエクスポートします。<br/>
               受け取った側は「<i class="fa-solid fa-right-to-bracket" style={{marginRight:3}}></i>インポート」に貼り付けることでグループを復元できます。
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <CopyButton text={groupShareText} label={<><i className="fa-regular fa-copy"></i> グループをコピー</>} />
+              <DownloadButton text={groupShareText} filename={'CoC6_グループ_' + sanitizeFilename(activeGroup.name || '無名のセッション') + '.txt'} />
             </div>
             <textarea readOnly value={groupShareText} rows={4} onClick={e => e.target.select()}
               style={{ width: '100%', marginTop: 10, fontSize: 10, fontFamily: 'monospace', background: 'var(--bg)', color: 'var(--bl)', border: '1px solid var(--bl-b)', resize: 'none' }} />

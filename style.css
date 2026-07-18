@@ -80,6 +80,7 @@ button { font-family: 'Special Elite', cursive; cursor: pointer; border: none; b
 .session-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
 .member-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 .dice-grid      { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.background-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 14px; }
 
 .creature-card { background: var(--bg2); border: 1px solid var(--bd); border-radius: 4px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
 .creature-card:hover { border-color: var(--pac); box-shadow: 0 0 14px rgba(201,168,76,0.07); }
@@ -131,5 +132,7 @@ button { font-family: 'Special Elite', cursive; cursor: pointer; border: none; b
   .dice-grid      { grid-template-columns: 1fr; }
   .tab-btn        { padding: 6px 10px; font-size: 11px; }
   .card           { padding: 12px; }
+  .btn-import     { font-size: 10px !important; padding: 4px 8px !important; }
+  .background-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 380px) { .abilities-grid { grid-template-columns: 1fr; } .info-grid { grid-template-columns: 1fr; } }
