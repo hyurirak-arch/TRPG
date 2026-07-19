@@ -861,6 +861,27 @@ function SkillReferenceModal({ onClose }) {
   );
 }
 
+function MadnessReferenceModal({ onClose }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target.className === 'modal-overlay' && onClose()}>
+      <div className="modal-inner" style={{ maxWidth: 720 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <h2 style={{ fontFamily: "'Cinzel', serif", color: 'var(--re2)', fontSize: 18, letterSpacing: '0.06em' }}>一時的狂気 カード一覧</h2>
+          <button className="btn-ghost" onClick={onClose} style={{ fontSize: 12 }}>閉じる</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '65vh', overflowY: 'auto', paddingRight: 4 }}>
+          {MADNESS_CARDS.map(card => (
+            <div key={card.title} style={{ background: 'var(--re-bg)', border: '1px solid var(--re-b)', borderRadius: 4, padding: '10px 14px' }}>
+              <div style={{ fontFamily: "'Cinzel', serif", color: 'var(--re2)', fontSize: 14, marginBottom: 5, letterSpacing: '0.04em' }}>{card.title}</div>
+              <div style={{ fontSize: 12, color: 'var(--tx)', lineHeight: 1.7 }}>{card.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================
 // CHARACTER DETAIL MODAL (read-only, for GM view)
 // ============================================================
@@ -1570,7 +1591,7 @@ function DiceRoller() {
 // TAB 3: SESSION MANAGER
 // ============================================================
 
-function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
+function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs, groups, setGroups, activeGroupId }) {
   const [newNpcName,  setNewNpcName]  = useState('');
   const [initList,    setInitList]    = useState([]);
   const [newInitName, setNewInitName] = useState('');
@@ -1578,6 +1599,7 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
   const [currentTurn, setCurrentTurn] = useState(0);
   const [madnessCard, setMadnessCard] = useState(null);
   const [madnessKey,  setMadnessKey]  = useState(0);
+  const [showMadnessRef, setShowMadnessRef] = useState(false);
 
   const addNpc  = () => { if (!newNpcName.trim()) return; setNpcs(prev => [...prev, { id: uid(), name: newNpcName.trim(), hp: '', memo: '' }]); setNewNpcName(''); };
   const upNpc   = (id,f,v) => setNpcs(prev => prev.map(n => n.id===id ? {...n,[f]:v} : n));
@@ -1586,17 +1608,40 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
   const nextTurn = () => { if (initList.length>0) setCurrentTurn(prev => (prev+1)%initList.length); };
   const delInit  = (id) => setInitList(prev => { const next=prev.filter(e=>e.id!==id); setCurrentTurn(t=>next.length>0?Math.min(t,next.length-1):0); return next; });
 
+  const activeGroup = (groups||[]).find(g => g.id === activeGroupId) || (groups||[])[0] || null;
+  const upMemberMemo = (mid, val) => setGroups(prev => prev.map(g => g.id === (activeGroup && activeGroup.id) ? { ...g, members: g.members.map(m => m.id===mid ? {...m,memo:val} : m) } : g));
+
   return (
     <div style={{ padding: '16px 20px', maxWidth: 960, margin: '0 auto' }}>
       <div className="card">
-        <div className="section-title">セッションノート</div>
+        <div className="section-title">GMノート<span style={{ fontSize: 10, color: 'var(--tx3)', marginLeft: 8, fontFamily: 'inherit', textTransform: 'none' }}></span></div>
         <div style={{ position: 'relative' }}>
-          <textarea value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} onInput={autoGrowTextarea} placeholder="セッションの出来事、重要な情報、謎のメモ..."
+          <textarea value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} onInput={autoGrowTextarea} placeholder="進行メモ、伏線の管理、判定の裏側など、自分だけが見る内容..."
             style={{ width: '100%', minHeight: 140, resize: 'vertical', lineHeight: 1.7, paddingRight: 16 }} />
           <span style={{ position: 'absolute', bottom: 5, right: 7, fontSize: 11, color: 'var(--tx3)', pointerEvents: 'none', lineHeight: 1, userSelect: 'none' }} title="ドラッグで拡大">⇲</span>
         </div>
         <div style={{ textAlign: 'right', fontSize: 10, color: 'var(--tx3)', marginTop: 4 }}>自動保存中</div>
       </div>
+
+      <div className="card">
+        <div className="section-title">探索者への秘密メモ<span style={{ fontSize: 10, color: 'var(--tx3)', marginLeft: 8, fontFamily: 'inherit', textTransform: 'none' }}></span></div>
+        {(!activeGroup || activeGroup.members.length === 0) ? (
+          <div style={{ color: 'var(--tx3)', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
+            「セッション管理」タブでメンバーを追加すると、ここに秘密メモ欄が表示されます
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {activeGroup.members.map(m => (
+              <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ width: 110, flexShrink: 0, fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
+                <input value={m.memo||''} onChange={e => upMemberMemo(m.id, e.target.value)}
+                  placeholder="状態、メモ、秘密情報..." style={{ flex: 1, fontSize: 12 }} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="session-grid">
         <div className="card" style={{ margin: 0 }}>
           <div className="section-title">NPC・登場人物</div>
@@ -1652,12 +1697,14 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
             onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--re-b)';}}>
             ☠ 狂気カードを引く
           </button>
+          <button className="btn-ghost" onClick={() => setShowMadnessRef(true)} style={{ fontSize: 12, flexShrink: 0, alignSelf: 'center' }}>📖 カード一覧</button>
           {madnessCard && <div key={madnessKey} className="madness-anim" style={{ flex:'1 1 240px',background:'var(--re-bg)',border:'1px solid var(--re-b)',borderRadius:4,padding:'12px 16px' }}>
             <div style={{ fontFamily:"'Cinzel', serif",color:'var(--re2)',fontSize:15,marginBottom:8,letterSpacing:'0.06em' }}>{madnessCard.title}</div>
             <div style={{ fontSize:13,color:'var(--tx)',lineHeight:1.75 }}>{madnessCard.desc}</div>
           </div>}
         </div>
       </div>
+      {showMadnessRef && <MadnessReferenceModal onClose={() => setShowMadnessRef(false)} />}
     </div>
   );
 }
@@ -1666,10 +1713,7 @@ function SessionManager({ sessionNotes, setSessionNotes, npcs, setNpcs }) {
 // TAB 4: GROUP MANAGER
 // ============================================================
 
-function GroupManager({ groups, setGroups, localCharacters }) {
-  const [activeGroupId, setActiveGroupId] = useState(() => {
-    try { return localStorage.getItem('coc6-active-group') || null; } catch { return null; }
-  });
+function GroupManager({ groups, setGroups, localCharacters, activeGroupId, setActiveGroupId }) {
   const [viewingMember, setViewingMember] = useState(null);
   const [showAddLocal,  setShowAddLocal]  = useState(false);
   const [showImportMember, setShowImportMember] = useState(false);
@@ -1680,8 +1724,6 @@ function GroupManager({ groups, setGroups, localCharacters }) {
   const [groupImportErr,  setGroupImportErr]  = useState('');
   const [memberDragOver, setMemberDragOver] = useState(false);
   const [groupDragOver,  setGroupDragOver]  = useState(false);
-
-  useEffect(() => { try { localStorage.setItem('coc6-active-group', activeGroupId || ''); } catch {} }, [activeGroupId]);
 
   const activeGroup = groups.find(g => g.id === activeGroupId) || groups[0] || null;
 
@@ -1865,12 +1907,6 @@ function GroupManager({ groups, setGroups, localCharacters }) {
                       onDecrement={() => upMember(member.id,'san',clamp(member.san-1,0,member.maxSAN))}
                       onIncrement={() => upMember(member.id,'san',clamp(member.san+1,0,member.maxSAN))} />
                   </div>
-
-                  <div>
-                    <label style={{ ...LBL, marginBottom: 3 }}>GM メモ</label>
-                    <input value={member.memo} onChange={e => upMember(member.id,'memo',e.target.value)}
-                      placeholder="状態、メモ、秘密情報..." style={{ width: '100%', fontSize: 12 }} />
-                  </div>
                 </div>
               ))}
             </div>
@@ -1948,8 +1984,8 @@ function Bestiary() {
 const TABS = [
   { key: 'character', label: '探索者シート' },
   { key: 'dice',      label: 'ダイスロール' },
+  { key: 'gm',        label: 'ゲームマスター' },
   { key: 'session',   label: 'セッション管理' },
-  { key: 'group',     label: 'グループ' },
   { key: 'bestiary',  label: '神話生物図鑑' },
 ];
 
@@ -1976,6 +2012,9 @@ function App() {
 
   const [sessionNotes, setSessionNotes] = useState(() => localStorage.getItem('coc6-session-notes')||'');
   const [npcs, setNpcs] = useState(() => { try { return JSON.parse(localStorage.getItem('coc6-npcs'))||[]; } catch { return []; } });
+  const [activeGroupId, setActiveGroupId] = useState(() => {
+    try { return localStorage.getItem('coc6-active-group') || null; } catch { return null; }
+  });
 
   const activeChar = characters.find(c => c.id === activeCharId) || characters[0];
 
@@ -1997,6 +2036,7 @@ function App() {
   useEffect(()=>{ try{localStorage.setItem('coc6-groups',JSON.stringify(groups));}catch{} },[groups]);
   useEffect(()=>{ try{localStorage.setItem('coc6-session-notes',sessionNotes);}catch{} },[sessionNotes]);
   useEffect(()=>{ try{localStorage.setItem('coc6-npcs',JSON.stringify(npcs));}catch{} },[npcs]);
+  useEffect(()=>{ try{localStorage.setItem('coc6-active-group', activeGroupId||'');}catch{} },[activeGroupId]);
 
   return (
     <>
@@ -2031,8 +2071,8 @@ function App() {
           )}
           {activeTab === 'character' && activeChar && <CharacterSheet character={activeChar} onChange={updateChar} />}
           {activeTab === 'dice'      && <DiceRoller />}
-          {activeTab === 'session'   && <SessionManager sessionNotes={sessionNotes} setSessionNotes={setSessionNotes} npcs={npcs} setNpcs={setNpcs} />}
-          {activeTab === 'group'     && <GroupManager groups={groups} setGroups={setGroups} localCharacters={characters} />}
+          {activeTab === 'gm'        && <SessionManager sessionNotes={sessionNotes} setSessionNotes={setSessionNotes} npcs={npcs} setNpcs={setNpcs} groups={groups} setGroups={setGroups} activeGroupId={activeGroupId} />}
+          {activeTab === 'session'   && <GroupManager groups={groups} setGroups={setGroups} localCharacters={characters} activeGroupId={activeGroupId} setActiveGroupId={setActiveGroupId} />}
           {activeTab === 'bestiary'  && <Bestiary />}
         </main>
       </div>
